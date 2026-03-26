@@ -160,73 +160,95 @@ def go_to(stage: str):
 # ════════════════════════════════════════════════════════════════════════════════
 if st.session_state.stage == "upload":
     st.title("Data Suite")
-    st.subheader("Upload your dataset and tell the AI what you want to do")
 
-    col1, col2 = st.columns([2, 1])
+    # ── Phase A: file upload + initial load (only when no data loaded yet) ────
+    if st.session_state.df_raw is None:
+        st.subheader("Upload your dataset and tell the AI what you want to do")
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            uploaded = st.file_uploader(
+                "Choose a file (CSV, Excel, Parquet)",
+                type=["csv", "xlsx", "xls", "parquet"],
+            )
+            user_goal = st.text_area(
+                "What do you want to do? *(optional)*",
+                placeholder='e.g. "predict customer churn", "just explore the data", "I don\'t know yet"',
+                height=80,
+                key="user_goal_input",
+            )
+        with col2:
+            st.info("**Supported formats**\n- CSV\n- Excel (.xlsx / .xls)\n- Parquet")
 
-    with col1:
-        uploaded = st.file_uploader(
-            "Choose a file (CSV, Excel, Parquet)",
-            type=["csv", "xlsx", "xls", "parquet"],
-        )
-        user_goal = st.text_area(
-            "What do you want to do? *(optional)*",
-            placeholder='e.g. "predict customer churn", "just explore the data", "I don\'t know yet"',
-            height=80,
-        )
+        if uploaded and st.button("🚀 Start Analysis", type="primary"):
+            with st.spinner("Loading file..."):
+                try:
+                    df, meta = load_file(uploaded)
+                    st.session_state.df_raw = df
+                    st.session_state.meta = meta
+                    st.session_state.user_goal = st.session_state.get(
+                        "user_goal_input", ""
+                    )
+                except Exception as e:
+                    st.error(f"Failed to load file: {e}")
+                    st.stop()
 
-    with col2:
-        st.info("**Supported formats**\n- CSV\n- Excel (.xlsx / .xls)\n- Parquet")
+            with st.spinner("AI is analyzing your dataset..."):
+                try:
+                    response = st.session_state.analyst.analyze_intent(
+                        df, st.session_state.user_goal
+                    )
+                    st.session_state.ai_response["intent"] = response
+                except Exception as e:
+                    st.warning(
+                        f"AI analysis unavailable (check ANTHROPIC_API_KEY): {e}"
+                    )
 
-    if uploaded and st.button("🚀 Start Analysis", type="primary"):
-        with st.spinner("Loading file..."):
-            try:
-                df, meta = load_file(uploaded)
-                st.session_state.df_raw = df
-                st.session_state.meta = meta
-            except Exception as e:
-                st.error(f"Failed to load file: {e}")
-                st.stop()
+            st.rerun()  # clean rerun so config form renders from session state
 
-        with st.spinner("AI is analyzing your dataset..."):
-            try:
-                response = st.session_state.analyst.analyze_intent(df, user_goal)
-                st.session_state.ai_response["intent"] = response
-            except Exception as e:
-                st.warning(f"AI analysis unavailable (check ANTHROPIC_API_KEY): {e}")
-                response = ""
+    # ── Phase B: configure task + approve workflow (data is loaded) ───────────
+    else:
+        df = st.session_state.df_raw
+        meta = st.session_state.meta
 
-        # Show data preview
+        # Dataset preview
         st.subheader("Dataset Preview")
         c1, c2, c3 = st.columns(3)
         c1.metric("Rows", f"{len(df):,}")
         c2.metric("Columns", len(df.columns))
         c3.metric("Missing values", f"{df.isnull().sum().sum():,}")
         st.dataframe(df.head(10), use_container_width=True)
-
-        # Show null map
         if df.isnull().sum().sum() > 0:
             st.plotly_chart(null_heatmap(df), use_container_width=True)
 
-        # AI response
-        if response:
-            with st.container(border=True):
-                st.markdown("**🤖 AI Analyst says:**")
-                st.markdown(response)
-            st.text_area(
-                "Your response / answers to AI questions (optional)",
-                key="intent_reply",
+        # AI panel + follow-up reply
+        ai_panel("intent")
+        if "intent" in st.session_state.ai_response:
+            intent_reply = st.text_area(
+                "Your answers to the AI questions (optional)",
                 height=80,
+                key="intent_reply",
             )
+            if intent_reply and st.button("Send reply to AI"):
+                with st.spinner("AI is updating..."):
+                    try:
+                        follow_up = st.session_state.analyst.chat(intent_reply)
+                        st.session_state.ai_response["intent_followup"] = follow_up
+                        st.rerun()
+                    except Exception:
+                        pass
+            ai_panel("intent_followup")
+
+        st.divider()
 
         # Target + task type
         st.subheader("Configure Task")
         all_cols = df.columns.tolist()
         target_col = st.selectbox(
-            "Select target column", all_cols, index=len(all_cols) - 1
+            "Select target column",
+            all_cols,
+            index=len(all_cols) - 1,
+            key="target_col_select",
         )
-        meta.target_col = target_col
-
         inferred_task = infer_task_type(df, target_col)
         if meta.is_ts:
             inferred_task = "time_series"
@@ -234,19 +256,8 @@ if st.session_state.stage == "upload":
             "Task type",
             ["classification", "regression", "time_series"],
             index=["classification", "regression", "time_series"].index(inferred_task),
+            key="task_type_select",
         )
-        meta.task_type = task_type
-
-        # If user replied to AI, send it
-        if st.session_state.get("intent_reply"):
-            with st.spinner("AI is updating..."):
-                try:
-                    follow_up = st.session_state.analyst.chat(
-                        st.session_state.intent_reply
-                    )
-                    st.session_state.ai_response["intent_followup"] = follow_up
-                except Exception:
-                    pass
 
         # Workflow selection
         st.subheader("Workflow")
@@ -256,13 +267,24 @@ if st.session_state.stage == "upload":
             full_workflow,
             default=full_workflow,
             format_func=lambda s: stage_labels[s],
+            key="workflow_select",
         )
 
         if st.button("✅ Confirm & Proceed", type="primary"):
+            meta.target_col = target_col
+            meta.task_type = task_type
             meta.approved_workflow = selected_workflow
+            st.session_state.meta = meta
             st.session_state.workflow = ["upload"] + selected_workflow
             next_stage = selected_workflow[0] if selected_workflow else "report"
             go_to(next_stage)
+
+        if st.button("↺ Upload different file", type="secondary"):
+            st.session_state.df_raw = None
+            st.session_state.meta = None
+            st.session_state.ai_response = {}
+            st.session_state.analyst = DataAnalyst()
+            st.rerun()
 
 
 # ════════════════════════════════════════════════════════════════════════════════
@@ -334,8 +356,11 @@ elif st.session_state.stage == "clean":
             df_clean, report = clean(df, strategies, outlier_action, drop_dupes)
         st.session_state.df_clean = df_clean
         meta.cleaning_report = report
+        st.rerun()
 
-        # Show report
+    # Show results + Next after cleaning is done (outside button block)
+    if st.session_state.df_clean is not None:
+        report = meta.cleaning_report
         st.success(
             f"Cleaned: {report['duplicates_removed']} dupes removed, "
             f"{len(report['dropped_cols'])} cols dropped, "
@@ -345,8 +370,8 @@ elif st.session_state.stage == "clean":
         st.subheader("Before / After")
         c1, c2 = st.columns(2)
         c1.metric("Rows before", len(df))
-        c2.metric("Rows after", len(df_clean))
-        st.dataframe(df_clean.head(), use_container_width=True)
+        c2.metric("Rows after", len(st.session_state.df_clean))
+        st.dataframe(st.session_state.df_clean.head(), use_container_width=True)
 
         workflow = st.session_state.meta.approved_workflow
         idx = workflow.index("clean") if "clean" in workflow else -1
@@ -496,7 +521,12 @@ elif st.session_state.stage == "features":
             except Exception as e:
                 st.error(f"Feature engineering failed: {e}")
                 st.stop()
+        st.rerun()
 
+    # Show results + Next after engineering is done (outside button block)
+    if st.session_state.X is not None:
+        X = st.session_state.X
+        feat_report = meta.feature_report
         st.success(f"Features ready: {X.shape[1]} features × {len(X):,} rows")
         c1, c2, c3 = st.columns(3)
         c1.metric("Features added", len(feat_report.get("added", [])))
