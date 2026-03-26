@@ -464,7 +464,11 @@ elif st.session_state.stage == "eda":
         "Exploratory Data Analysis",
         "Understand distributions, correlations, and patterns",
     )
-    df = st.session_state.df_clean or st.session_state.df_raw
+    df = (
+        st.session_state.df_clean
+        if st.session_state.df_clean is not None
+        else st.session_state.df_raw
+    )
     meta: DatasetMeta = st.session_state.meta
 
     if "eda" not in st.session_state.ai_response:
@@ -545,7 +549,11 @@ elif st.session_state.stage == "features":
         "Feature Engineering",
         "Encode, scale, and create features for modeling",
     )
-    df = st.session_state.df_clean or st.session_state.df_raw
+    df = (
+        st.session_state.df_clean
+        if st.session_state.df_clean is not None
+        else st.session_state.df_raw
+    )
     meta: DatasetMeta = st.session_state.meta
 
     if "features" not in st.session_state.ai_response:
@@ -806,10 +814,14 @@ elif st.session_state.stage == "report":
     X = st.session_state.X
     y = st.session_state.y
     meta: DatasetMeta = st.session_state.meta
-    model = st.session_state.best_model or (
-        list(st.session_state.trained_models.values())[0]
-        if st.session_state.trained_models
-        else None
+    model = (
+        st.session_state.best_model
+        if st.session_state.best_model is not None
+        else (
+            list(st.session_state.trained_models.values())[0]
+            if st.session_state.trained_models
+            else None
+        )
     )
 
     if model is None or X is None:
