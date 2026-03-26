@@ -1,4 +1,4 @@
-"""Data Suite — AI-powered end-to-end data analysis platform."""
+"""Miss Datrix — AI-powered end-to-end data analysis platform."""
 
 from __future__ import annotations
 import sys
@@ -7,6 +7,7 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 import streamlit as st
+from styles import inject_css, page_header, ai_panel_html, COMPARISON_HTML
 
 from pipeline.loader import load_file, infer_task_type, DatasetMeta
 from pipeline.cleaner import clean, auto_null_strategies, outlier_summary
@@ -36,11 +37,12 @@ from utils.plot_utils import (
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Data Suite",
-    page_icon="🔬",
+    page_title="Miss Datrix",
+    page_icon="✦",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+inject_css()
 
 
 # ── Session state init ────────────────────────────────────────────────────────
@@ -79,55 +81,73 @@ _init_state()
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.title("🔬 Data Suite")
-    st.caption("AI-guided data analysis")
-
-    # Why not Claude.ai?
-    with st.expander("Why not just use Claude?", expanded=False):
-        st.markdown("""
-**Claude.ai can *talk* about your data.**
-This app *runs* against it.
-
-✓ Loads your real file — no copy-pasting
-✓ Trains actual models you can download
-✓ Runs Optuna (50+ tuning trials)
-✓ Computes SHAP / feature importance
-✓ Interactive Plotly charts
-✓ Exports HTML report + `.pkl` model
-✓ AI scales to large files (reads stats, not raw rows)
-✓ Workflow adapts to your goal
-        """)
+    st.markdown(
+        """
+    <div style="padding:1rem 0 0.5rem">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:1.4rem;font-weight:700;
+                  background:linear-gradient(135deg,#7c3aed,#db2777);
+                  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+                  background-clip:text;">✦ Miss Datrix</div>
+      <div style="font-size:0.75rem;color:#64748b;letter-spacing:0.08em;text-transform:uppercase;margin-top:2px;">
+        AI Data Analysis Platform
+      </div>
+    </div>
+    """,
+        unsafe_allow_html=True,
+    )
 
     st.divider()
 
     # Stage indicator
     stages = ["upload", "clean", "eda", "features", "models", "optimize", "report"]
     stage_labels = {
-        "upload": "📂 Load & Intent",
-        "clean": "🧹 Clean",
-        "eda": "🔍 EDA",
-        "features": "⚙️ Features",
-        "models": "🤖 Models",
-        "optimize": "🎯 Optimize",
-        "report": "📊 Report",
+        "upload": "Load & Intent",
+        "clean": "Clean",
+        "eda": "EDA",
+        "features": "Features",
+        "models": "Models",
+        "optimize": "Optimize",
+        "report": "Report",
+    }
+    stage_icons = {
+        "upload": "01",
+        "clean": "02",
+        "eda": "03",
+        "features": "04",
+        "models": "05",
+        "optimize": "06",
+        "report": "07",
     }
     current = st.session_state.stage
     for s in stages:
         if s not in st.session_state.workflow and s != "upload":
             continue
         label = stage_labels[s]
+        num = stage_icons[s]
         if s == current:
-            st.markdown(f"**→ {label}**")
+            st.markdown(
+                f'<div class="nav-item-active">→ {num} · {label}</div>',
+                unsafe_allow_html=True,
+            )
         elif stages.index(s) < stages.index(current):
-            st.markdown(f"~~{label}~~ ✓")
+            st.markdown(
+                f'<div class="nav-item-done">✓ {num} · {label}</div>',
+                unsafe_allow_html=True,
+            )
         else:
-            st.markdown(f"  {label}")
+            st.markdown(
+                f'<div class="nav-item-pending">{num} · {label}</div>',
+                unsafe_allow_html=True,
+            )
 
     st.divider()
 
     # Persistent chat
     if st.session_state.df_raw is not None:
-        st.subheader("💬 Ask the Analyst")
+        st.markdown(
+            '<div style="font-size:0.8rem;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:#7c3aed;margin-bottom:0.5rem;">✦ Ask the Analyst</div>',
+            unsafe_allow_html=True,
+        )
         user_q = st.text_input(
             "Ask anything about your data",
             key="chat_input",
@@ -145,9 +165,13 @@ def ai_panel(stage: str, response_key: str | None = None):
     """Show AI response for a stage. Cache in session state."""
     key = response_key or stage
     if key in st.session_state.ai_response:
-        with st.container(border=True):
-            st.markdown("**🤖 AI Analyst**")
-            st.markdown(st.session_state.ai_response[key])
+        content = st.session_state.ai_response[key]
+        # Convert markdown bold to html for the custom panel
+        import re
+
+        content_html = content.replace("\n", "<br>")
+        content_html = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", content_html)
+        ai_panel_html(content_html)
 
 
 def go_to(stage: str):
@@ -159,27 +183,70 @@ def go_to(stage: str):
 # STAGE 0: UPLOAD + INTENT
 # ════════════════════════════════════════════════════════════════════════════════
 if st.session_state.stage == "upload":
-    st.title("Data Suite")
-
     # ── Phase A: file upload + initial load (only when no data loaded yet) ────
     if st.session_state.df_raw is None:
-        st.subheader("Upload your dataset and tell the AI what you want to do")
-        col1, col2 = st.columns([2, 1])
+        # Hero
+        st.markdown(
+            """
+        <div style="padding: 3rem 0 2rem; text-align: center;">
+          <div class="gradient-title">Miss Datrix</div>
+          <div class="gradient-subtitle" style="margin-top:0.5rem;">
+            AI-Powered Data Analysis · From raw file to trained model in minutes
+          </div>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
+
+        # Upload + intent
+        col1, col2 = st.columns([3, 2], gap="large")
         with col1:
+            st.markdown('<div class="datrix-card">', unsafe_allow_html=True)
             uploaded = st.file_uploader(
-                "Choose a file (CSV, Excel, Parquet)",
+                "Drop your dataset here",
                 type=["csv", "xlsx", "xls", "parquet"],
+                label_visibility="visible",
             )
             user_goal = st.text_area(
-                "What do you want to do? *(optional)*",
-                placeholder='e.g. "predict customer churn", "just explore the data", "I don\'t know yet"',
-                height=80,
+                "What do you want to do?",
+                placeholder='e.g. "predict customer churn" · "just explore" · "I don\'t know"',
+                height=90,
                 key="user_goal_input",
             )
-        with col2:
-            st.info("**Supported formats**\n- CSV\n- Excel (.xlsx / .xls)\n- Parquet")
+            if uploaded:
+                st.button(
+                    "✦ Start Analysis",
+                    type="primary",
+                    use_container_width=True,
+                    key="start_btn",
+                )
+            st.markdown("</div>", unsafe_allow_html=True)
 
-        if uploaded and st.button("🚀 Start Analysis", type="primary"):
+        with col2:
+            st.markdown(
+                """
+            <div class="datrix-card" style="height:100%">
+              <div class="gradient-subtitle" style="margin-bottom:1rem;">What Miss Datrix does</div>
+              <div style="display:flex;flex-direction:column;gap:0.6rem">
+                <div style="color:#e2e8f0;font-size:0.88rem">✦ &nbsp;Loads your real file and runs against it</div>
+                <div style="color:#e2e8f0;font-size:0.88rem">✦ &nbsp;AI analyst asks the right questions</div>
+                <div style="color:#e2e8f0;font-size:0.88rem">✦ &nbsp;Auto-cleans, engineers features</div>
+                <div style="color:#e2e8f0;font-size:0.88rem">✦ &nbsp;Benchmarks 5 models with real CV</div>
+                <div style="color:#e2e8f0;font-size:0.88rem">✦ &nbsp;Tunes hyperparameters (Optuna)</div>
+                <div style="color:#e2e8f0;font-size:0.88rem">✦ &nbsp;Exports model + HTML report</div>
+              </div>
+              <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid rgba(124,58,237,0.2)">
+                <div style="font-size:0.75rem;color:#64748b">Supports CSV · Excel · Parquet · up to 200 MB</div>
+              </div>
+            </div>
+            """,
+                unsafe_allow_html=True,
+            )
+
+        # Comparison table
+        st.markdown(COMPARISON_HTML, unsafe_allow_html=True)
+
+        if uploaded and st.session_state.get("start_btn"):
             with st.spinner("Loading file..."):
                 try:
                     df, meta = load_file(uploaded)
@@ -210,7 +277,11 @@ if st.session_state.stage == "upload":
         df = st.session_state.df_raw
         meta = st.session_state.meta
 
-        # Dataset preview
+        page_header(
+            "Stage 01",
+            "Dataset Loaded",
+            "Review the data, configure your task, and select a workflow",
+        )
         st.subheader("Dataset Preview")
         c1, c2, c3 = st.columns(3)
         c1.metric("Rows", f"{len(df):,}")
@@ -291,7 +362,11 @@ if st.session_state.stage == "upload":
 # STAGE 1: CLEAN
 # ════════════════════════════════════════════════════════════════════════════════
 elif st.session_state.stage == "clean":
-    st.title("🧹 Data Cleaning")
+    page_header(
+        "Stage 02",
+        "Data Cleaning",
+        "Fix nulls, outliers, and duplicates before modeling",
+    )
     df = st.session_state.df_raw
     meta: DatasetMeta = st.session_state.meta
 
@@ -384,7 +459,11 @@ elif st.session_state.stage == "clean":
 # STAGE 2: EDA
 # ════════════════════════════════════════════════════════════════════════════════
 elif st.session_state.stage == "eda":
-    st.title("🔍 Exploratory Data Analysis")
+    page_header(
+        "Stage 03",
+        "Exploratory Data Analysis",
+        "Understand distributions, correlations, and patterns",
+    )
     df = st.session_state.df_clean or st.session_state.df_raw
     meta: DatasetMeta = st.session_state.meta
 
@@ -461,7 +540,11 @@ elif st.session_state.stage == "eda":
 # STAGE 3: FEATURE ENGINEERING
 # ════════════════════════════════════════════════════════════════════════════════
 elif st.session_state.stage == "features":
-    st.title("⚙️ Feature Engineering")
+    page_header(
+        "Stage 04",
+        "Feature Engineering",
+        "Encode, scale, and create features for modeling",
+    )
     df = st.session_state.df_clean or st.session_state.df_raw
     meta: DatasetMeta = st.session_state.meta
 
@@ -545,7 +628,9 @@ elif st.session_state.stage == "features":
 # STAGE 4: MODEL SELECTION
 # ════════════════════════════════════════════════════════════════════════════════
 elif st.session_state.stage == "models":
-    st.title("🤖 Model Selection")
+    page_header(
+        "Stage 05", "Model Selection", "Benchmark multiple models and find the best fit"
+    )
     X = st.session_state.X
     y = st.session_state.y
     meta: DatasetMeta = st.session_state.meta
@@ -619,7 +704,11 @@ elif st.session_state.stage == "models":
 # STAGE 5: OPTIMIZE
 # ════════════════════════════════════════════════════════════════════════════════
 elif st.session_state.stage == "optimize":
-    st.title("🎯 Hyperparameter Optimization")
+    page_header(
+        "Stage 06",
+        "Hyperparameter Optimization",
+        "Bayesian search for the best model configuration",
+    )
     X = st.session_state.X
     y = st.session_state.y
     meta: DatasetMeta = st.session_state.meta
@@ -709,7 +798,11 @@ elif st.session_state.stage == "optimize":
 # STAGE 6: REPORT
 # ════════════════════════════════════════════════════════════════════════════════
 elif st.session_state.stage == "report":
-    st.title("📊 Results & Report")
+    page_header(
+        "Stage 07",
+        "Results & Report",
+        "Final evaluation, feature importance, and export",
+    )
     X = st.session_state.X
     y = st.session_state.y
     meta: DatasetMeta = st.session_state.meta
@@ -804,7 +897,7 @@ elif st.session_state.stage == "report":
             mime="text/html",
         )
 
-    if st.button("🔄 Start New Analysis"):
+    if st.button("✦ Start New Analysis", type="secondary"):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()
