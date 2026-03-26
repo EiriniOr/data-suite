@@ -307,7 +307,10 @@ hr { border-color: var(--border) !important; margin: 1.5rem 0 !important; }
 
 COMPARISON_HTML = """
 <div class="datrix-card" style="margin: 1.5rem 0;">
-<p class="gradient-subtitle" style="margin-bottom:1rem;">Miss Datrix vs Claude.ai</p>
+<p class="gradient-subtitle" style="margin-bottom:0.4rem;">Miss Datrix vs Claude.ai</p>
+<p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:1rem;">
+  Both are powered by Claude. The difference is what the application does with it.
+</p>
 <table class="compare-table">
 <thead>
   <tr>
@@ -318,69 +321,59 @@ COMPARISON_HTML = """
 </thead>
 <tbody>
   <tr>
-    <td>Loads real files</td>
-    <td><span class="check">✓</span> CSV / Excel / Parquet up to 200 MB</td>
-    <td><span class="cross">~</span> Reads summaries, not full data</td>
+    <td>AI model</td>
+    <td><span class="check">✓</span> Claude API (Sonnet)</td>
+    <td><span class="check">✓</span> Claude (same model family)</td>
   </tr>
   <tr>
-    <td>Runs actual code</td>
-    <td><span class="check">✓</span> Executes Python pipeline on your data</td>
-    <td><span class="cross">✗</span> Suggests code only</td>
+    <td>Automated ML pipeline</td>
+    <td><span class="check">✓</span> End-to-end: clean → EDA → model → tune → report</td>
+    <td><span class="cross">✗</span> General assistant — no pipeline</td>
   </tr>
   <tr>
     <td>Model training</td>
-    <td><span class="check">✓</span> Trains 5 models, real CV scores</td>
+    <td><span class="check">✓</span> Trains 5 algorithms with real cross-validation scores</td>
     <td><span class="cross">✗</span> Cannot train models</td>
   </tr>
   <tr>
     <td>Hyperparameter tuning</td>
     <td><span class="check">✓</span> Optuna Bayesian search (50+ trials)</td>
-    <td><span class="cross">✗</span> Cannot tune</td>
+    <td><span class="cross">✗</span> Cannot run Optuna or tune</td>
   </tr>
   <tr>
     <td>Feature importance</td>
-    <td><span class="check">✓</span> Real SHAP / tree importance on your model</td>
-    <td><span class="cross">✗</span> Estimates only</td>
+    <td><span class="check">✓</span> SHAP values / tree importances on your trained model</td>
+    <td><span class="cross">✗</span> Cannot compute on real model</td>
+  </tr>
+  <tr>
+    <td>Downloadable artifacts</td>
+    <td><span class="check">✓</span> Trained .pkl + standalone HTML report</td>
+    <td><span class="cross">✗</span> No file exports</td>
   </tr>
   <tr>
     <td>Interactive charts</td>
-    <td><span class="check">✓</span> Plotly — zoom, hover, filter</td>
-    <td><span class="cross">~</span> Static images</td>
+    <td><span class="check">✓</span> Plotly — zoom, hover, linked to your data</td>
+    <td><span class="cross">~</span> Static rendered images</td>
   </tr>
   <tr>
-    <td>Exports</td>
-    <td><span class="check">✓</span> .pkl model + HTML report</td>
-    <td><span class="cross">✗</span> Copy-paste only</td>
+    <td>File handling</td>
+    <td><span class="check">✓</span> CSV / Excel / Parquet up to 200 MB, processed in Python</td>
+    <td><span class="check">~</span> Can read files, limited by context window</td>
   </tr>
   <tr>
-    <td>Scales to large files</td>
-    <td><span class="check">✓</span> AI reads stats, not raw rows</td>
-    <td><span class="cross">✗</span> Context window limits large data</td>
+    <td>Scope</td>
+    <td><span class="con">~</span> ML / data science workflows only</td>
+    <td><span class="pro">✓</span> Any topic or task</td>
   </tr>
   <tr>
-    <td>Adaptive workflow</td>
-    <td><span class="check">✓</span> AI proposes only the stages you need</td>
-    <td><span class="cross">~</span> You decide what to ask</td>
-  </tr>
-  <tr>
-    <td>Domain memory</td>
-    <td><span class="check">✓</span> AI remembers all previous stages in session</td>
-    <td><span class="cross">~</span> Single conversation thread</td>
-  </tr>
-  <tr>
-    <td>General knowledge</td>
-    <td><span class="con">✗</span> Domain-specific only</td>
-    <td><span class="pro">✓</span> Broad knowledge</td>
-  </tr>
-  <tr>
-    <td>Custom queries</td>
-    <td><span class="con">~</span> Limited to DS workflow</td>
-    <td><span class="pro">✓</span> Anything</td>
+    <td>Freeform questions</td>
+    <td><span class="check">✓</span> Chat sidebar available at every stage</td>
+    <td><span class="pro">✓</span> Native conversational interface</td>
   </tr>
 </tbody>
 </table>
 <p style="color: var(--text-muted); font-size:0.8rem; margin-top:0.75rem;">
-  ✓ advantage &nbsp;·&nbsp; ✗ not available &nbsp;·&nbsp; ~ partial
+  ✓ available &nbsp;·&nbsp; ✗ not available &nbsp;·&nbsp; ~ partial or limited
 </p>
 </div>
 """
