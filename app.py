@@ -252,6 +252,42 @@ def go_to(stage: str):
     st.rerun()
 
 
+# ── Cached pipeline wrappers ──────────────────────────────────────────────────
+# @st.cache_data keeps results across reruns so Streamlit doesn't re-execute
+# heavy steps on every widget interaction. Wrappers live here to keep
+# pipeline/ free of Streamlit imports.
+
+
+@st.cache_data(max_entries=1, show_spinner=False)
+def _cached_engineer_features(
+    df,
+    target_col,
+    task_type,
+    scaler_type,
+    drop_high_corr,
+    is_ts,
+    dt_col,
+    lag_windows,
+    rolling_windows,
+):
+    return engineer_features(
+        df,
+        target_col=target_col,
+        task_type=task_type,
+        scaler_type=scaler_type,
+        drop_high_corr=drop_high_corr,
+        is_ts=is_ts,
+        dt_col=dt_col,
+        lag_windows=lag_windows,
+        rolling_windows=rolling_windows,
+    )
+
+
+@st.cache_data(max_entries=1, show_spinner=False)
+def _cached_benchmark_models(X, y, task_type, is_ts):
+    return benchmark_models(X, y, task_type, is_ts)
+
+
 # ════════════════════════════════════════════════════════════════════════════════
 # STAGE 0: UPLOAD + INTENT
 # ════════════════════════════════════════════════════════════════════════════════
@@ -810,16 +846,16 @@ elif st.session_state.stage == "features":
     if st.button("⚙️ Engineer Features", type="primary"):
         with st.spinner("Engineering features..."):
             try:
-                X, y, feat_report = engineer_features(
+                X, y, feat_report = _cached_engineer_features(
                     df,
-                    target_col=meta.target_col,
-                    task_type=meta.task_type,
-                    scaler_type=scaler_type,
-                    drop_high_corr=drop_high_corr,
-                    is_ts=meta.is_ts,
-                    dt_col=meta.datetime_col,
-                    lag_windows=lag_windows,
-                    rolling_windows=rolling_windows,
+                    meta.target_col,
+                    meta.task_type,
+                    scaler_type,
+                    drop_high_corr,
+                    meta.is_ts,
+                    meta.datetime_col,
+                    tuple(lag_windows) if lag_windows else None,
+                    tuple(rolling_windows) if rolling_windows else None,
                 )
                 st.session_state.X = X
                 st.session_state.y = y
@@ -871,7 +907,7 @@ elif st.session_state.stage == "models":
         if st.button("🚀 Benchmark Models", type="primary"):
             progress = st.progress(0, text="Training models...")
             with st.spinner("Benchmarking..."):
-                leaderboard, trained_models, primary_metric = benchmark_models(
+                leaderboard, trained_models, primary_metric = _cached_benchmark_models(
                     X,
                     y,
                     meta.task_type,
