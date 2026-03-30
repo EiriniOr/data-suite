@@ -46,17 +46,124 @@ inject_css()
 
 
 # ── Login gate ────────────────────────────────────────────────────────────────
+_LOGIN_HTML = """
+<style>
+.md-wrap{max-width:860px;margin:1.5rem auto 0.5rem;display:grid;grid-template-columns:1fr 1.1fr;gap:2rem;align-items:start;padding:0 1rem}
+.md-left{text-align:center}
+.md-logo{font-size:2.1rem;font-weight:900;background:linear-gradient(135deg,#06b6d4,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:0;letter-spacing:-.02em}
+.md-tagline{color:#64748b;font-size:.85rem;margin:.2rem 0 1rem}
+.md-label{color:#475569;font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;margin-bottom:.6rem}
+.md-carousel{background:linear-gradient(135deg,rgba(30,27,75,.6),rgba(15,15,45,.85));border:1px solid rgba(124,58,237,.25);border-radius:14px;padding:1.4rem;position:relative}
+.md-track{position:relative;min-height:130px}
+.md-slide{position:absolute;top:0;left:0;right:0;opacity:0;animation:mdc 36s infinite}
+.md-slide:nth-child(1){animation-delay:0s}
+.md-slide:nth-child(2){animation-delay:6s}
+.md-slide:nth-child(3){animation-delay:12s}
+.md-slide:nth-child(4){animation-delay:18s}
+.md-slide:nth-child(5){animation-delay:24s}
+.md-slide:nth-child(6){animation-delay:30s}
+@keyframes mdc{0%{opacity:0;transform:translateY(6px)}4%{opacity:1;transform:translateY(0)}14%{opacity:1;transform:translateY(0)}18%{opacity:0;transform:translateY(-6px)}100%{opacity:0}}
+.md-sicon{font-size:1.5rem;margin-bottom:.35rem}
+.md-stitle{color:#e2e8f0;font-size:.93rem;font-weight:700;margin-bottom:.28rem}
+.md-sdesc{color:#94a3b8;font-size:.8rem;line-height:1.55}
+.md-sdesc b{color:#22d3ee}
+.md-vs{display:inline-block;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.35);color:#fbbf24;font-size:.65rem;padding:1px 7px;border-radius:999px;margin-bottom:.3rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.md-dots{display:flex;justify-content:center;gap:5px;margin-top:.9rem}
+.md-dot{width:6px;height:6px;border-radius:50%;background:rgba(124,58,237,.25);animation:mdd 36s infinite}
+.md-dot:nth-child(1){animation-delay:0s}.md-dot:nth-child(2){animation-delay:6s}.md-dot:nth-child(3){animation-delay:12s}
+.md-dot:nth-child(4){animation-delay:18s}.md-dot:nth-child(5){animation-delay:24s}.md-dot:nth-child(6){animation-delay:30s}
+@keyframes mdd{0%,2%{background:rgba(124,58,237,.25);transform:scale(1)}4%,14%{background:#7c3aed;transform:scale(1.4)}18%,100%{background:rgba(124,58,237,.25);transform:scale(1)}}
+@media(max-width:600px){.md-wrap{grid-template-columns:1fr}}
+</style>
+<div class="md-wrap">
+  <div class="md-left">
+    <p class="md-logo">✦ Miss Datrix</p>
+    <p class="md-tagline">Your AI-powered data science advisor</p>
+    <svg width="200" height="252" viewBox="0 0 200 252" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="aura" cx="50%" cy="60%" r="50%"><stop offset="0%" stop-color="#7c3aed" stop-opacity=".45"/><stop offset="100%" stop-color="#07071a" stop-opacity="0"/></radialGradient>
+        <linearGradient id="sk" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fcd5b5"/><stop offset="100%" stop-color="#f4a472"/></linearGradient>
+        <linearGradient id="hr" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#4c1d95"/><stop offset="60%" stop-color="#6d28d9"/><stop offset="100%" stop-color="#0369a1"/></linearGradient>
+        <linearGradient id="ot" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1e1b4b"/><stop offset="100%" stop-color="#07071a"/></linearGradient>
+      </defs>
+      <ellipse cx="100" cy="145" rx="88" ry="95" fill="url(#aura)"/>
+      <g transform="translate(148,52)" opacity=".8">
+        <rect width="42" height="32" rx="4" fill="rgba(10,10,35,.85)" stroke="#6d28d9" stroke-width="1"/>
+        <polyline points="5,25 13,16 21,20 30,9 37,13" fill="none" stroke="#06b6d4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="37" cy="13" r="2" fill="#06b6d4"/>
+      </g>
+      <g transform="translate(8,58)" opacity=".75">
+        <circle cx="6" cy="10" r="3.5" fill="#7c3aed"/><circle cx="6" cy="22" r="3.5" fill="#7c3aed"/>
+        <circle cx="20" cy="4" r="3.5" fill="#06b6d4"/><circle cx="20" cy="16" r="3.5" fill="#06b6d4"/><circle cx="20" cy="28" r="3.5" fill="#06b6d4"/>
+        <circle cx="34" cy="10" r="3.5" fill="#a78bfa"/><circle cx="34" cy="22" r="3.5" fill="#a78bfa"/>
+        <line x1="9.5" y1="10" x2="16.5" y2="4" stroke="#4c1d95" stroke-width=".8"/><line x1="9.5" y1="10" x2="16.5" y2="16" stroke="#4c1d95" stroke-width=".8"/>
+        <line x1="9.5" y1="22" x2="16.5" y2="16" stroke="#4c1d95" stroke-width=".8"/><line x1="9.5" y1="22" x2="16.5" y2="28" stroke="#4c1d95" stroke-width=".8"/>
+        <line x1="23.5" y1="4" x2="30.5" y2="10" stroke="#4c1d95" stroke-width=".8"/><line x1="23.5" y1="16" x2="30.5" y2="10" stroke="#4c1d95" stroke-width=".8"/>
+        <line x1="23.5" y1="16" x2="30.5" y2="22" stroke="#4c1d95" stroke-width=".8"/><line x1="23.5" y1="28" x2="30.5" y2="22" stroke="#4c1d95" stroke-width=".8"/>
+      </g>
+      <text x="152" y="104" font-size="11" fill="#fbbf24" opacity=".9">✦</text>
+      <text x="42" y="98" font-size="7" fill="#a78bfa" opacity=".7">✦</text>
+      <path d="M55 250 Q52 215 44 198 Q68 183 100 181 Q132 183 156 198 Q148 215 145 250Z" fill="url(#ot)"/>
+      <path d="M93 183 L100 200 L107 183" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
+      <rect x="90" y="167" width="20" height="18" rx="5" fill="url(#sk)"/>
+      <ellipse cx="100" cy="138" rx="46" ry="50" fill="url(#hr)"/>
+      <ellipse cx="100" cy="142" rx="38" ry="41" fill="url(#sk)"/>
+      <path d="M62 122 Q64 90 82 83 Q100 77 118 83 Q136 90 138 122 Q124 112 100 110 Q76 112 62 122Z" fill="url(#hr)"/>
+      <path d="M64 135 Q54 148 56 172 Q61 185 68 183 Q62 164 66 145Z" fill="url(#hr)"/>
+      <path d="M136 135 Q146 148 144 172 Q139 185 132 183 Q138 164 134 145Z" fill="url(#hr)"/>
+      <ellipse cx="62" cy="148" rx="7" ry="9" fill="url(#sk)"/><ellipse cx="138" cy="148" rx="7" ry="9" fill="url(#sk)"/>
+      <ellipse cx="62" cy="148" rx="4" ry="6" fill="#e8a472"/><ellipse cx="138" cy="148" rx="4" ry="6" fill="#e8a472"/>
+      <path d="M80 127 Q88 123 96 125" fill="none" stroke="#3b0764" stroke-width="2.2" stroke-linecap="round"/>
+      <path d="M104 125 Q112 123 120 127" fill="none" stroke="#3b0764" stroke-width="2.2" stroke-linecap="round"/>
+      <rect x="74" y="131" width="22" height="16" rx="5" fill="rgba(6,182,212,.08)" stroke="#06b6d4" stroke-width="1.8"/>
+      <rect x="102" y="131" width="22" height="16" rx="5" fill="rgba(6,182,212,.08)" stroke="#06b6d4" stroke-width="1.8"/>
+      <line x1="96" y1="139" x2="102" y2="139" stroke="#06b6d4" stroke-width="1.8"/>
+      <line x1="74" y1="139" x2="68" y2="140" stroke="#06b6d4" stroke-width="1.5"/>
+      <line x1="124" y1="139" x2="130" y2="140" stroke="#06b6d4" stroke-width="1.5"/>
+      <circle cx="85" cy="139" r="4.5" fill="#1e0040"/><circle cx="113" cy="139" r="4.5" fill="#1e0040"/>
+      <circle cx="85" cy="139" r="2.8" fill="#4c1d95"/><circle cx="113" cy="139" r="2.8" fill="#4c1d95"/>
+      <circle cx="86.5" cy="137.5" r="1.6" fill="white"/><circle cx="114.5" cy="137.5" r="1.6" fill="white"/>
+      <path d="M97 153 Q100 159 103 153" fill="none" stroke="#c97c50" stroke-width="1.3" stroke-linecap="round"/>
+      <path d="M88 165 Q100 174 112 165" fill="none" stroke="#c97c50" stroke-width="1.8" stroke-linecap="round"/>
+      <ellipse cx="80" cy="162" rx="7" ry="4" fill="#f4a4a4" opacity=".28"/><ellipse cx="120" cy="162" rx="7" ry="4" fill="#f4a4a4" opacity=".28"/>
+      <path d="M84 83 Q100 79 114 85 Q108 91 100 90 Q93 90 84 83Z" fill="white" opacity=".14"/>
+      <g transform="translate(62,210)">
+        <rect width="76" height="46" rx="5" fill="#0d0b20" stroke="#4c1d95" stroke-width="1.5"/>
+        <rect x="3" y="3" width="70" height="40" rx="3" fill="#07071a"/>
+        <rect x="10" y="30" width="7" height="8" fill="#7c3aed" opacity=".9"/>
+        <rect x="19" y="23" width="7" height="15" fill="#06b6d4" opacity=".9"/>
+        <rect x="28" y="16" width="7" height="22" fill="#7c3aed" opacity=".9"/>
+        <rect x="37" y="20" width="7" height="18" fill="#a78bfa" opacity=".9"/>
+        <rect x="46" y="11" width="7" height="27" fill="#06b6d4" opacity=".9"/>
+        <line x1="6" y1="38" x2="58" y2="38" stroke="#1e293b" stroke-width=".8"/>
+      </g>
+    </svg>
+  </div>
+  <div>
+    <div class="md-label">What Miss Datrix does</div>
+    <div class="md-carousel">
+      <div class="md-track">
+        <div class="md-slide"><div class="md-sicon">📂</div><div class="md-stitle">Upload Any Dataset</div><div class="md-sdesc">CSV, Excel, or Parquet. Reads the schema, detects time series, and <b>proposes a workflow tailored to your goal</b> — not a fixed template.</div></div>
+        <div class="md-slide"><div class="md-sicon">🤖</div><div class="md-stitle">Real Model Training</div><div class="md-sdesc">Benchmarks RF, XGBoost, LightGBM, SVM, Logistic/Ridge with <b>5-fold cross-validation</b>. Ranked leaderboard. You pick the winner.</div></div>
+        <div class="md-slide"><div class="md-sicon">⚙️</div><div class="md-stitle">Optuna Hyperparameter Tuning</div><div class="md-sdesc"><b>Bayesian search</b> — smarter than grid search. Runs 100s of trials, shows improvement curve, reveals what each hyperparameter actually does.</div></div>
+        <div class="md-slide"><div class="md-sicon">🔍</div><div class="md-stitle">SHAP Explainability</div><div class="md-sdesc">Computes <b>real SHAP values</b> on your model. Feature importance, confusion matrix, ROC curve, residual plots, downloadable HTML report.</div></div>
+        <div class="md-slide"><div class="md-sicon">🧪</div><div class="md-stitle">A/B Testing & Causal Inference</div><div class="md-sdesc">Beyond correlation. Welch/chi-square tests, <b>propensity score matching</b>, IPW, ATE with bootstrap SE, covariate balance analysis.</div></div>
+        <div class="md-slide"><div class="md-vs">vs Claude.ai</div><div class="md-stitle">Not Just a Chatbot</div><div class="md-sdesc">Claude.ai <em>talks</em> about your data. Miss Datrix <b>runs real code on it</b> — trains models you can download, computes actual SHAP, runs Optuna, scales to large files.</div></div>
+      </div>
+      <div class="md-dots"><div class="md-dot"></div><div class="md-dot"></div><div class="md-dot"></div><div class="md-dot"></div><div class="md-dot"></div><div class="md-dot"></div></div>
+    </div>
+  </div>
+</div>
+"""
+
+
 def _check_login() -> bool:
-    """Return True if user is authenticated. Gate the whole app behind a login form."""
+    """Gate the app behind a login form with visual branding."""
     if st.session_state.get("authenticated"):
         return True
 
-    st.markdown(
-        "<h2 style='text-align:center;margin-top:3rem;'>Miss Datrix</h2>"
-        "<p style='text-align:center;color:#94a3b8;margin-bottom:2rem;'>Invite-only access</p>",
-        unsafe_allow_html=True,
-    )
-    col = st.columns([1, 1.2, 1])[1]
+    st.markdown(_LOGIN_HTML, unsafe_allow_html=True)
+    _, col, _ = st.columns([1, 1, 1])
     with col:
         username = st.text_input("Username", key="_login_user")
         password = st.text_input("Password", type="password", key="_login_pass")
