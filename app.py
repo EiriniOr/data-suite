@@ -49,6 +49,9 @@ inject_css()
 def _init_state():
     defaults = {
         "stage": "upload",
+        "mode": "ml_pipeline",  # "ml_pipeline" | "ab_test" | "causal"
+        "ab_test_results": None,
+        "causal_results": None,
         "df_raw": None,
         "df_clean": None,
         "df_engineered": None,
@@ -198,6 +201,58 @@ if st.session_state.stage == "upload":
             unsafe_allow_html=True,
         )
 
+        # Mode selector
+        st.markdown(
+            """
+        <div style="margin-bottom:1.5rem">
+          <div class="gradient-subtitle" style="margin-bottom:0.75rem;">Choose analysis type</div>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
+        mode_col1, mode_col2, mode_col3 = st.columns(3, gap="medium")
+        with mode_col1:
+            st.markdown(
+                """<div class="datrix-card" style="text-align:center;cursor:pointer">
+                <div style="font-size:1.5rem;margin-bottom:0.5rem">🤖</div>
+                <div style="font-weight:600;color:#e2e8f0;margin-bottom:0.25rem">ML Pipeline</div>
+                <div style="font-size:0.8rem;color:#64748b">Clean → EDA → Models → Tune → Report</div>
+                </div>""",
+                unsafe_allow_html=True,
+            )
+        with mode_col2:
+            st.markdown(
+                """<div class="datrix-card" style="text-align:center;cursor:pointer">
+                <div style="font-size:1.5rem;margin-bottom:0.5rem">🧪</div>
+                <div style="font-weight:600;color:#e2e8f0;margin-bottom:0.25rem">A/B Test</div>
+                <div style="font-size:0.8rem;color:#64748b">Statistical significance, effect size, power</div>
+                </div>""",
+                unsafe_allow_html=True,
+            )
+        with mode_col3:
+            st.markdown(
+                """<div class="datrix-card" style="text-align:center;cursor:pointer">
+                <div style="font-size:1.5rem;margin-bottom:0.5rem">🔍</div>
+                <div style="font-weight:600;color:#e2e8f0;margin-bottom:0.25rem">Causal Analysis</div>
+                <div style="font-size:0.8rem;color:#64748b">ATE via propensity score matching</div>
+                </div>""",
+                unsafe_allow_html=True,
+            )
+
+        selected_mode = st.radio(
+            "Mode",
+            ["ml_pipeline", "ab_test", "causal"],
+            format_func=lambda m: {
+                "ml_pipeline": "🤖 ML Pipeline",
+                "ab_test": "🧪 A/B Test",
+                "causal": "🔍 Causal Analysis",
+            }[m],
+            horizontal=True,
+            label_visibility="collapsed",
+            key="mode_radio",
+        )
+        st.session_state.mode = selected_mode
+
         # Upload + intent
         col1, col2 = st.columns([3, 2], gap="large")
         with col1:
@@ -207,12 +262,13 @@ if st.session_state.stage == "upload":
                 type=["csv", "xlsx", "xls", "parquet"],
                 label_visibility="visible",
             )
-            user_goal = st.text_area(
-                "What do you want to do?",
-                placeholder='e.g. "predict customer churn" · "just explore" · "I don\'t know"',
-                height=90,
-                key="user_goal_input",
-            )
+            if selected_mode == "ml_pipeline":
+                user_goal = st.text_area(
+                    "What do you want to do?",
+                    placeholder='e.g. "predict customer churn" · "just explore" · "I don\'t know"',
+                    height=90,
+                    key="user_goal_input",
+                )
             if uploaded:
                 st.button(
                     "✦ Start Analysis",
@@ -252,6 +308,7 @@ if st.session_state.stage == "upload":
                     df, meta = load_file(uploaded)
                     st.session_state.df_raw = df
                     st.session_state.meta = meta
+                    st.session_state.mode = selected_mode
                     st.session_state.user_goal = st.session_state.get(
                         "user_goal_input", ""
                     )
@@ -259,16 +316,17 @@ if st.session_state.stage == "upload":
                     st.error(f"Failed to load file: {e}")
                     st.stop()
 
-            with st.spinner("AI is analyzing your dataset..."):
-                try:
-                    response = st.session_state.analyst.analyze_intent(
-                        df, st.session_state.user_goal
-                    )
-                    st.session_state.ai_response["intent"] = response
-                except Exception as e:
-                    st.warning(
-                        f"AI analysis unavailable (check ANTHROPIC_API_KEY): {e}"
-                    )
+            if selected_mode == "ml_pipeline":
+                with st.spinner("AI is analyzing your dataset..."):
+                    try:
+                        response = st.session_state.analyst.analyze_intent(
+                            df, st.session_state.user_goal
+                        )
+                        st.session_state.ai_response["intent"] = response
+                    except Exception as e:
+                        st.warning(
+                            f"AI analysis unavailable (check ANTHROPIC_API_KEY): {e}"
+                        )
 
             st.rerun()  # clean rerun so config form renders from session state
 
@@ -276,11 +334,20 @@ if st.session_state.stage == "upload":
     else:
         df = st.session_state.df_raw
         meta = st.session_state.meta
+        mode = st.session_state.mode
 
+        all_cols = df.columns.tolist()
+
+        # ── Preview (all modes) ───────────────────────────────────────────────
+        mode_labels = {
+            "ml_pipeline": "ML Pipeline",
+            "ab_test": "A/B Test",
+            "causal": "Causal Analysis",
+        }
         page_header(
-            "Stage 01",
+            "Step 01",
             "Dataset Loaded",
-            "Review the data, configure your task, and select a workflow",
+            f"Mode: {mode_labels.get(mode, mode)} · Configure columns and proceed",
         )
         st.subheader("Dataset Preview")
         c1, c2, c3 = st.columns(3)
@@ -291,70 +358,148 @@ if st.session_state.stage == "upload":
         if df.isnull().sum().sum() > 0:
             st.plotly_chart(null_heatmap(df), use_container_width=True)
 
-        # AI panel + follow-up reply
-        ai_panel("intent")
-        if "intent" in st.session_state.ai_response:
-            intent_reply = st.text_area(
-                "Your answers to the AI questions (optional)",
-                height=80,
-                key="intent_reply",
-            )
-            if intent_reply and st.button("Send reply to AI"):
-                with st.spinner("AI is updating..."):
-                    try:
-                        follow_up = st.session_state.analyst.chat(intent_reply)
-                        st.session_state.ai_response["intent_followup"] = follow_up
-                        st.rerun()
-                    except Exception:
-                        pass
-            ai_panel("intent_followup")
-
         st.divider()
 
-        # Target + task type
-        st.subheader("Configure Task")
-        all_cols = df.columns.tolist()
-        target_col = st.selectbox(
-            "Select target column",
-            all_cols,
-            index=len(all_cols) - 1,
-            key="target_col_select",
-        )
-        inferred_task = infer_task_type(df, target_col)
-        if meta.is_ts:
-            inferred_task = "time_series"
-        task_type = st.selectbox(
-            "Task type",
-            ["classification", "regression", "time_series"],
-            index=["classification", "regression", "time_series"].index(inferred_task),
-            key="task_type_select",
-        )
+        # ── Mode-specific config ──────────────────────────────────────────────
+        if mode == "ml_pipeline":
+            # AI panel + follow-up
+            ai_panel("intent")
+            if "intent" in st.session_state.ai_response:
+                intent_reply = st.text_area(
+                    "Your answers to the AI questions (optional)",
+                    height=80,
+                    key="intent_reply",
+                )
+                if intent_reply and st.button("Send reply to AI"):
+                    with st.spinner("AI is updating..."):
+                        try:
+                            follow_up = st.session_state.analyst.chat(intent_reply)
+                            st.session_state.ai_response["intent_followup"] = follow_up
+                            st.rerun()
+                        except Exception:
+                            pass
+                ai_panel("intent_followup")
+            st.divider()
 
-        # Workflow selection
-        st.subheader("Workflow")
-        full_workflow = ["clean", "eda", "features", "models", "optimize", "report"]
-        selected_workflow = st.multiselect(
-            "Select stages to run",
-            full_workflow,
-            default=full_workflow,
-            format_func=lambda s: stage_labels[s],
-            key="workflow_select",
-        )
+            st.subheader("Configure Task")
+            target_col = st.selectbox(
+                "Select target column",
+                all_cols,
+                index=len(all_cols) - 1,
+                key="target_col_select",
+            )
+            inferred_task = infer_task_type(df, target_col)
+            if meta.is_ts:
+                inferred_task = "time_series"
+            task_type = st.selectbox(
+                "Task type",
+                ["classification", "regression", "time_series"],
+                index=["classification", "regression", "time_series"].index(
+                    inferred_task
+                ),
+                key="task_type_select",
+            )
 
-        if st.button("✅ Confirm & Proceed", type="primary"):
-            meta.target_col = target_col
-            meta.task_type = task_type
-            meta.approved_workflow = selected_workflow
-            st.session_state.meta = meta
-            st.session_state.workflow = ["upload"] + selected_workflow
-            next_stage = selected_workflow[0] if selected_workflow else "report"
-            go_to(next_stage)
+            st.subheader("Workflow")
+            full_workflow = ["clean", "eda", "features", "models", "optimize", "report"]
+            selected_workflow = st.multiselect(
+                "Select stages to run",
+                full_workflow,
+                default=full_workflow,
+                format_func=lambda s: stage_labels[s],
+                key="workflow_select",
+            )
+
+            if st.button("✅ Confirm & Proceed", type="primary"):
+                meta.target_col = target_col
+                meta.task_type = task_type
+                meta.approved_workflow = selected_workflow
+                st.session_state.meta = meta
+                st.session_state.workflow = ["upload"] + selected_workflow
+                next_stage = selected_workflow[0] if selected_workflow else "report"
+                go_to(next_stage)
+
+        elif mode == "ab_test":
+            st.subheader("Configure A/B Test")
+            treatment_col = st.selectbox(
+                "Treatment / group column (2 unique values)",
+                all_cols,
+                key="ab_treatment_col",
+            )
+            outcome_col = st.selectbox(
+                "Outcome column (what you're measuring)",
+                [c for c in all_cols if c != treatment_col],
+                key="ab_outcome_col",
+            )
+            alpha = st.select_slider(
+                "Significance level (α)",
+                options=[0.01, 0.05, 0.10],
+                value=0.05,
+                key="ab_alpha",
+            )
+
+            groups = df[treatment_col].dropna().unique()
+            if len(groups) == 2:
+                g = sorted(groups, key=str)
+                st.info(
+                    f"Control: **{g[0]}** · Treatment: **{g[1]}** · {len(df):,} rows"
+                )
+            else:
+                st.warning(
+                    f"Treatment column has {len(groups)} unique values — must be exactly 2."
+                )
+
+            if st.button("🧪 Run A/B Test", type="primary"):
+                st.session_state.ab_treatment_col = treatment_col
+                st.session_state.ab_outcome_col = outcome_col
+                st.session_state.ab_alpha = alpha
+                go_to("ab_test")
+
+        elif mode == "causal":
+            st.subheader("Configure Causal Analysis")
+            treatment_col = st.selectbox(
+                "Treatment column (binary: 0/1 or two labels)",
+                all_cols,
+                key="ca_treatment_col",
+            )
+            outcome_col = st.selectbox(
+                "Outcome column (continuous or binary)",
+                [c for c in all_cols if c != treatment_col],
+                key="ca_outcome_col",
+            )
+            covariate_cols = st.multiselect(
+                "Covariate columns (confounders to adjust for)",
+                [c for c in all_cols if c not in [treatment_col, outcome_col]],
+                key="ca_covariate_cols",
+                help="Select variables that affect both treatment assignment and outcome.",
+            )
+            method = st.radio(
+                "Estimation method",
+                ["psm", "ipw"],
+                format_func=lambda m: {
+                    "psm": "Propensity Score Matching (1:1 nearest neighbor)",
+                    "ipw": "Inverse Probability Weighting (IPW)",
+                }[m],
+                key="ca_method",
+            )
+
+            if not covariate_cols:
+                st.warning("Select at least one covariate to adjust for confounding.")
+
+            if covariate_cols and st.button("🔍 Run Causal Analysis", type="primary"):
+                st.session_state.ca_treatment_col = treatment_col
+                st.session_state.ca_outcome_col = outcome_col
+                st.session_state.ca_covariate_cols = covariate_cols
+                st.session_state.ca_method = method
+                go_to("causal")
 
         if st.button("↺ Upload different file", type="secondary"):
             st.session_state.df_raw = None
             st.session_state.meta = None
             st.session_state.ai_response = {}
             st.session_state.analyst = DataAnalyst()
+            st.session_state.ab_test_results = None
+            st.session_state.causal_results = None
             st.rerun()
 
 
@@ -910,6 +1055,166 @@ elif st.session_state.stage == "report":
         )
 
     if st.button("✦ Start New Analysis", type="secondary"):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# A/B TEST STAGE
+# ════════════════════════════════════════════════════════════════════════════════
+elif st.session_state.stage == "ab_test":
+    page_header(
+        "A/B Test",
+        "Statistical Analysis",
+        "Significance, effect size, confidence intervals, and power",
+    )
+    df = st.session_state.df_raw
+    treatment_col = st.session_state.get("ab_treatment_col")
+    outcome_col = st.session_state.get("ab_outcome_col")
+    alpha = st.session_state.get("ab_alpha", 0.05)
+
+    if df is None or not treatment_col or not outcome_col:
+        st.error("Missing configuration. Go back and set up the test.")
+        st.stop()
+
+    # Run test if not cached
+    if st.session_state.ab_test_results is None:
+        with st.spinner("Running statistical test..."):
+            try:
+                results = run_ab_test(df, treatment_col, outcome_col, alpha=alpha)
+                st.session_state.ab_test_results = results
+            except Exception as e:
+                st.error(f"Test failed: {e}")
+                st.stop()
+
+    results = st.session_state.ab_test_results
+
+    # AI interpretation
+    if "ab_test" not in st.session_state.ai_response:
+        with st.spinner("AI is interpreting results..."):
+            try:
+                response = st.session_state.analyst.analyze_ab_test(results)
+                st.session_state.ai_response["ab_test"] = response
+            except Exception as e:
+                st.session_state.ai_response["ab_test"] = f"*(AI unavailable: {e})*"
+    ai_panel("ab_test")
+
+    st.divider()
+
+    # Key metrics
+    sig = results.get("significant")
+    sig_label = "✅ Significant" if sig else "❌ Not significant"
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("p-value", f"{results.get('p_value'):.6f}")
+    c2.metric(
+        results.get("effect_size_label", "Effect size"),
+        f"{results.get('effect_size'):.4f}",
+        delta=results.get("effect_interpretation"),
+    )
+    c3.metric("Power", f"{results.get('power', 0):.2%}")
+    c4.metric("Result", sig_label)
+
+    if results.get("outcome_type") == "continuous":
+        st.info(
+            f"**{results['test_name']}** · "
+            f"Mean diff: {results.get('mean_diff'):+.4f} · "
+            f"95% CI: {results.get('ci_95')} · "
+            f"Normality: {'met' if results.get('normal_assumption_met') else 'not met (Mann-Whitney used)'}"
+        )
+    else:
+        ctrl_rate = results.get("control_rate", 0)
+        trt_rate = results.get("treatment_rate", 0)
+        st.info(
+            f"**{results['test_name']}** · "
+            f"{results['control_label']}: {ctrl_rate:.2%} · "
+            f"{results['treatment_label']}: {trt_rate:.2%} · "
+            f"Lift: {results.get('lift_pct'):+.1f}%"
+        )
+
+    st.subheader("Group Statistics")
+    st.dataframe(results["group_stats"], use_container_width=True)
+
+    for name, fig in results.get("figures", {}).items():
+        st.subheader(name.replace("_", " ").title())
+        st.plotly_chart(fig, use_container_width=True)
+
+    if st.button("↺ Start New Analysis", type="secondary"):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# CAUSAL ANALYSIS STAGE
+# ════════════════════════════════════════════════════════════════════════════════
+elif st.session_state.stage == "causal":
+    page_header(
+        "Causal Analysis",
+        "Treatment Effect Estimation",
+        "Average Treatment Effect via propensity score adjustment",
+    )
+    df = st.session_state.df_raw
+    treatment_col = st.session_state.get("ca_treatment_col")
+    outcome_col = st.session_state.get("ca_outcome_col")
+    covariate_cols = st.session_state.get("ca_covariate_cols", [])
+    method = st.session_state.get("ca_method", "psm")
+
+    if df is None or not treatment_col or not outcome_col or not covariate_cols:
+        st.error("Missing configuration. Go back and set up the analysis.")
+        st.stop()
+
+    # Run analysis if not cached
+    if st.session_state.causal_results is None:
+        with st.spinner("Estimating treatment effect (bootstrap may take ~10s)..."):
+            try:
+                results = run_causal(
+                    df, treatment_col, outcome_col, covariate_cols, method=method
+                )
+                st.session_state.causal_results = results
+            except Exception as e:
+                st.error(f"Causal analysis failed: {e}")
+                st.stop()
+
+    results = st.session_state.causal_results
+
+    # AI interpretation
+    if "causal" not in st.session_state.ai_response:
+        with st.spinner("AI is interpreting results..."):
+            try:
+                response = st.session_state.analyst.analyze_causal(results)
+                st.session_state.ai_response["causal"] = response
+            except Exception as e:
+                st.session_state.ai_response["causal"] = f"*(AI unavailable: {e})*"
+    ai_panel("causal")
+
+    st.divider()
+
+    # Key metrics
+    sig = results.get("significant")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Naive diff", f"{results.get('naive_diff'):+.4f}")
+    c2.metric("ATE (adjusted)", f"{results.get('ate'):+.4f}")
+    c3.metric("95% CI", f"[{results['ate_ci'][0]:+.3f}, {results['ate_ci'][1]:+.3f}]")
+    c4.metric("Significant", "✅ Yes" if sig else "❌ No (CI crosses zero)")
+
+    st.info(
+        f"**Method:** {results.get('method')} · "
+        f"Confounder bias removed: {results.get('bias_reduction_pct')}% · "
+        f"Matched n: {results.get('matched_n') or 'N/A (IPW)'}"
+    )
+
+    # Balance table
+    balance = results.get("balance_stats")
+    if balance is not None and not balance.empty:
+        st.subheader("Covariate Balance")
+        st.dataframe(balance, use_container_width=True)
+
+    for name, fig in results.get("figures", {}).items():
+        st.subheader(name.replace("_", " ").title())
+        st.plotly_chart(fig, use_container_width=True)
+
+    if st.button("↺ Start New Analysis", type="secondary"):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()

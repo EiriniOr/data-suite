@@ -21,7 +21,7 @@ from ai.context_builder import (
     build_dataset_context,
     build_model_results_context,
     build_optimization_context,
-)
+)  # noqa: F401 — ab_test/causal used by new methods below
 
 
 class DataAnalyst:
@@ -103,6 +103,22 @@ class DataAnalyst:
             if v is not None:
                 context_lines.append(f"- {k}: {v}")
         prompt = STAGE_PROMPTS["report"] + "\n\n" + "\n".join(context_lines)
+        return self._chat(prompt)
+
+    def analyze_ab_test(self, results: dict) -> str:
+        """Interpret A/B test results."""
+        from ai.context_builder import build_ab_test_context
+
+        ctx = build_ab_test_context(results)
+        prompt = STAGE_PROMPTS["ab_test"] + f"\n\n{ctx}"
+        return self._chat(prompt)
+
+    def analyze_causal(self, results: dict) -> str:
+        """Interpret causal inference results."""
+        from ai.context_builder import build_causal_context
+
+        ctx = build_causal_context(results)
+        prompt = STAGE_PROMPTS["causal"] + f"\n\n{ctx}"
         return self._chat(prompt)
 
     def chat(self, user_message: str) -> str:
