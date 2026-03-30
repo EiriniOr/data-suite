@@ -276,6 +276,42 @@ hr { border-color: var(--border) !important; margin: 1.5rem 0 !important; }
     margin-bottom: 0.75rem;
 }
 
+/* ── Inline term tooltips ───────────────────────────────────────────────────── */
+.tt {
+    border-bottom: 1px dashed var(--accent-purple);
+    cursor: help;
+    position: relative;
+    display: inline-block;
+    color: inherit;
+}
+.tt .tt-text {
+    visibility: hidden;
+    opacity: 0;
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    border: 1px solid var(--border-strong);
+    border-left: 3px solid var(--accent-purple);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    font-size: 0.8rem;
+    line-height: 1.55;
+    max-width: 280px;
+    min-width: 180px;
+    position: absolute;
+    z-index: 9999;
+    bottom: 130%;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: normal;
+    box-shadow: var(--shadow);
+    transition: opacity 0.15s ease;
+    pointer-events: none;
+}
+.tt:hover .tt-text {
+    visibility: visible;
+    opacity: 1;
+}
+
 /* ── Scrollbar ─────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

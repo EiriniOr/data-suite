@@ -1106,30 +1106,95 @@ elif st.session_state.stage == "ab_test":
     sig = results.get("significant")
     sig_label = "✅ Significant" if sig else "❌ Not significant"
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("p-value", f"{results.get('p_value'):.6f}")
+    c1.metric(
+        "p-value",
+        f"{results.get('p_value'):.6f}",
+        help=(
+            "Probability of seeing a result this extreme if there were truly no effect "
+            "(the null hypothesis). Below your chosen α means statistically significant — "
+            "but note: significance ≠ practical importance."
+        ),
+    )
     c2.metric(
         results.get("effect_size_label", "Effect size"),
         f"{results.get('effect_size'):.4f}",
         delta=results.get("effect_interpretation"),
+        help=(
+            "Cohen's d (continuous): standardised difference in means. "
+            "0.2 = small, 0.5 = medium, 0.8 = large.\n\n"
+            "Cramér's V (binary): association strength between groups. "
+            "0.1 = small, 0.3 = medium, 0.5 = large.\n\n"
+            "Effect size tells you practical importance — a tiny p-value with negligible "
+            "effect size rarely matters in practice."
+        ),
     )
-    c3.metric("Power", f"{results.get('power', 0):.2%}")
-    c4.metric("Result", sig_label)
+    c3.metric(
+        "Statistical Power",
+        f"{results.get('power', 0):.2%}",
+        help=(
+            "Probability of detecting a true effect if one actually exists. "
+            "Convention: ≥ 80% is acceptable. "
+            "Below 80% means the test may have missed a real effect (Type II error). "
+            "Power depends on sample size, effect size, and α."
+        ),
+    )
+    c4.metric(
+        "Result",
+        sig_label,
+        help=f"Compared against α = {results.get('alpha', 0.05)}. "
+        "A significant result means the observed difference is unlikely under the null hypothesis. "
+        "It does NOT prove causation.",
+    )
 
     if results.get("outcome_type") == "continuous":
-        st.info(
-            f"**{results['test_name']}** · "
-            f"Mean diff: {results.get('mean_diff'):+.4f} · "
-            f"95% CI: {results.get('ci_95')} · "
-            f"Normality: {'met' if results.get('normal_assumption_met') else 'not met (Mann-Whitney used)'}"
+        test_explanations = {
+            "Welch's t-test": "Compares means of two groups. Robust to unequal variances.",
+            "Mann-Whitney U": "Non-parametric test — compares rank distributions, not means. Used when normality is violated.",
+        }
+        test_name = results["test_name"]
+        test_tip = test_explanations.get(test_name, "")
+        normality_ok = results.get("normal_assumption_met")
+        st.markdown(
+            f"""<div class="datrix-card" style="font-size:0.88rem;line-height:1.8">
+            <span class="tt"><strong>{test_name}</strong><span class="tt-text">{test_tip}</span></span>
+            &nbsp;·&nbsp;
+            <span class="tt">Mean diff<span class="tt-text">
+                Treatment mean minus control mean. Positive = treatment group scored higher.
+            </span></span>: <strong>{results.get("mean_diff"):+.4f}</strong>
+            &nbsp;·&nbsp;
+            <span class="tt">95% CI<span class="tt-text">
+                Confidence interval for the true mean difference. If this range excludes zero,
+                the effect is statistically significant at α=0.05.
+                Under repeated sampling, 95% of such intervals would contain the true value.
+            </span></span>: <strong>{results.get("ci_95")}</strong>
+            &nbsp;·&nbsp;
+            <span class="tt">Normality<span class="tt-text">
+                Shapiro-Wilk test checked whether each group's outcome is normally distributed.
+                If not met, Mann-Whitney U is used instead of t-test.
+            </span></span>: {"met" if normality_ok else "not met → Mann-Whitney used"}
+            </div>""",
+            unsafe_allow_html=True,
         )
     else:
         ctrl_rate = results.get("control_rate", 0)
         trt_rate = results.get("treatment_rate", 0)
-        st.info(
-            f"**{results['test_name']}** · "
-            f"{results['control_label']}: {ctrl_rate:.2%} · "
-            f"{results['treatment_label']}: {trt_rate:.2%} · "
-            f"Lift: {results.get('lift_pct'):+.1f}%"
+        st.markdown(
+            f"""<div class="datrix-card" style="font-size:0.88rem;line-height:1.8">
+            <span class="tt"><strong>Chi-square test</strong><span class="tt-text">
+                Tests whether group membership and outcome are independent.
+                A significant result means the outcome distribution differs across groups.
+            </span></span>
+            &nbsp;·&nbsp;
+            {results["control_label"]}: <strong>{ctrl_rate:.2%}</strong>
+            &nbsp;·&nbsp;
+            {results["treatment_label"]}: <strong>{trt_rate:.2%}</strong>
+            &nbsp;·&nbsp;
+            <span class="tt">Lift<span class="tt-text">
+                Relative change in conversion rate: (treatment − control) / control × 100.
+                A lift of +10% means the treatment group converted 10% more than control.
+            </span></span>: <strong>{results.get("lift_pct"):+.1f}%</strong>
+            </div>""",
+            unsafe_allow_html=True,
         )
 
     st.subheader("Group Statistics")
@@ -1193,21 +1258,77 @@ elif st.session_state.stage == "causal":
     # Key metrics
     sig = results.get("significant")
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Naive diff", f"{results.get('naive_diff'):+.4f}")
-    c2.metric("ATE (adjusted)", f"{results.get('ate'):+.4f}")
-    c3.metric("95% CI", f"[{results['ate_ci'][0]:+.3f}, {results['ate_ci'][1]:+.3f}]")
-    c4.metric("Significant", "✅ Yes" if sig else "❌ No (CI crosses zero)")
+    c1.metric(
+        "Naive difference",
+        f"{results.get('naive_diff'):+.4f}",
+        help=(
+            "Raw difference in average outcome between treated and untreated groups, "
+            "with no adjustment for confounders. This is the biased estimate — "
+            "the groups may differ on other variables that also affect the outcome."
+        ),
+    )
+    c2.metric(
+        "ATE (adjusted)",
+        f"{results.get('ate'):+.4f}",
+        help=(
+            "Average Treatment Effect — the estimated causal effect of treatment on the outcome, "
+            "after adjusting for observed confounders via propensity score methods. "
+            "Interpreted as: 'on average, being treated changes the outcome by this amount.'"
+        ),
+    )
+    c3.metric(
+        "95% CI",
+        f"[{results['ate_ci'][0]:+.3f}, {results['ate_ci'][1]:+.3f}]",
+        help=(
+            "Bootstrap confidence interval for the ATE. "
+            "If this range excludes zero, the effect is statistically distinguishable from no effect. "
+            "Wider CI = more uncertainty (small sample or high variance)."
+        ),
+    )
+    c4.metric(
+        "Significant",
+        "✅ Yes" if sig else "❌ No (CI crosses zero)",
+        help=(
+            "Significance here means the 95% CI excludes zero — "
+            "the adjusted effect is unlikely to be zero. "
+            "Note: this does NOT account for unmeasured confounders."
+        ),
+    )
 
-    st.info(
-        f"**Method:** {results.get('method')} · "
-        f"Confounder bias removed: {results.get('bias_reduction_pct')}% · "
-        f"Matched n: {results.get('matched_n') or 'N/A (IPW)'}"
+    st.markdown(
+        f"""<div class="datrix-card" style="font-size:0.88rem;line-height:1.8">
+        <span class="tt"><strong>Method</strong><span class="tt-text">
+            PSM (Propensity Score Matching): pairs each treated unit with the most similar
+            control unit based on propensity score. Creates a matched sample.<br><br>
+            IPW (Inverse Probability Weighting): reweights all observations so the
+            treated and control groups look similar, without discarding data.
+        </span></span>: {results.get("method")}
+        &nbsp;·&nbsp;
+        <span class="tt">Confounder bias removed<span class="tt-text">
+            How much the ATE estimate shifted after adjusting for confounders,
+            relative to the naive difference. Large values mean confounders were
+            significantly distorting the raw comparison.
+        </span></span>: <strong>{results.get("bias_reduction_pct")}%</strong>
+        &nbsp;·&nbsp;
+        Matched n: <strong>{results.get("matched_n") or "N/A (IPW)"}</strong>
+        </div>""",
+        unsafe_allow_html=True,
     )
 
     # Balance table
     balance = results.get("balance_stats")
     if balance is not None and not balance.empty:
         st.subheader("Covariate Balance")
+        st.markdown(
+            """<p style="font-size:0.82rem;color:#94a3b8">
+            <span class="tt" style="color:#94a3b8">SMD (Standardized Mean Difference)
+            <span class="tt-text">Measures how different the treated and control groups are
+            on each covariate, in standard deviation units. |SMD| &lt; 0.1 = well balanced.
+            Values above 0.1 after matching indicate residual imbalance that may bias the ATE.
+            </span></span> — lower is better after matching.
+            </p>""",
+            unsafe_allow_html=True,
+        )
         st.dataframe(balance, use_container_width=True)
 
     for name, fig in results.get("figures", {}).items():
