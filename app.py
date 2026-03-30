@@ -164,17 +164,87 @@ with st.sidebar:
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+def _md_to_html(text: str) -> str:
+    """Convert common markdown patterns to styled HTML for the AI panel."""
+    import re
+
+    def inline(s: str) -> str:
+        s = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", s)
+        s = re.sub(r"\*(.+?)\*", r"<em style='color:#c4b5fd'>\1</em>", s)
+        return s
+
+    lines = text.split("\n")
+    out = []
+    in_ul = in_ol = False
+
+    def close_lists():
+        nonlocal in_ul, in_ol
+        if in_ul:
+            out.append("</ul>")
+            in_ul = False
+        if in_ol:
+            out.append("</ol>")
+            in_ol = False
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            close_lists()
+            continue
+
+        h2 = re.match(r"^#{1,2} (.+)", stripped)
+        h3 = re.match(r"^#{3} (.+)", stripped)
+        bullet = re.match(r"^[-•*] (.+)", stripped)
+        numbered = re.match(r"^\d+\. (.+)", stripped)
+
+        if h2:
+            close_lists()
+            out.append(
+                f'<p style="font-family:Space Grotesk,sans-serif;font-weight:600;'
+                f"color:#c4b5fd;margin:0.8rem 0 0.15rem;font-size:0.9rem;"
+                f'text-transform:uppercase;letter-spacing:0.05em">{inline(h2.group(1))}</p>'
+            )
+        elif h3:
+            close_lists()
+            out.append(
+                f'<p style="font-weight:600;color:#e2e8f0;margin:0.6rem 0 0.1rem">'
+                f"{inline(h3.group(1))}</p>"
+            )
+        elif bullet:
+            if not in_ul:
+                close_lists()
+                out.append(
+                    '<ul style="margin:0.3rem 0 0.3rem 1rem;padding:0;'
+                    'list-style:disc;color:var(--text-secondary)">'
+                )
+                in_ul = True
+            out.append(f"<li style='margin:0.18rem 0'>{inline(bullet.group(1))}</li>")
+        elif numbered:
+            if not in_ol:
+                close_lists()
+                out.append(
+                    '<ol style="margin:0.3rem 0 0.3rem 1.2rem;padding:0;'
+                    'color:var(--text-secondary)">'
+                )
+                in_ol = True
+            out.append(f"<li style='margin:0.18rem 0'>{inline(numbered.group(1))}</li>")
+        else:
+            close_lists()
+            out.append(
+                f'<p style="margin:0.3rem 0;color:var(--text-secondary);line-height:1.65">'
+                f"{inline(stripped)}</p>"
+            )
+
+    close_lists()
+    return "\n".join(out)
+
+
 def ai_panel(stage: str, response_key: str | None = None):
     """Show AI response for a stage. Cache in session state."""
     key = response_key or stage
     if key in st.session_state.ai_response:
         content = st.session_state.ai_response[key]
-        # Convert markdown bold to html for the custom panel
-        import re
-
-        content_html = content.replace("\n", "<br>")
-        content_html = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", content_html)
-        ai_panel_html(content_html)
+        ai_panel_html(_md_to_html(content))
 
 
 def go_to(stage: str):
@@ -774,6 +844,11 @@ elif st.session_state.stage == "features":
         idx = workflow.index("features") if "features" in workflow else -1
         next_stage = workflow[idx + 1] if idx + 1 < len(workflow) else "report"
         if st.button("Next →", key="next_features"):
+            import gc
+
+            st.session_state.df_clean = None  # X and y are ready; free DataFrame copies
+            st.session_state.df_raw = None
+            gc.collect()
             go_to(next_stage)
 
 
@@ -850,6 +925,10 @@ elif st.session_state.stage == "models":
         idx = workflow.index("models") if "models" in workflow else -1
         next_stage = workflow[idx + 1] if idx + 1 < len(workflow) else "report"
         if st.button("Next →", key="next_models"):
+            import gc
+
+            st.session_state.trained_models = None  # free 5 fitted model objects
+            gc.collect()
             go_to(next_stage)
 
 

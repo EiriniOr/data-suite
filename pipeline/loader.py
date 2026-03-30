@@ -24,11 +24,14 @@ class DatasetMeta:
     best_model_metric: str | None = None
 
     def to_dict(self) -> dict:
-        return {
-            k: v
-            for k, v in self.__dict__.items()
-            if v is not None and v != [] and v != {}
-        }
+        def _keep(v) -> bool:
+            if v is None:
+                return False
+            if isinstance(v, (list, dict)):
+                return len(v) > 0
+            return True
+
+        return {k: v for k, v in self.__dict__.items() if _keep(v)}
 
 
 def load_file(uploaded_file) -> tuple[pd.DataFrame, DatasetMeta]:
