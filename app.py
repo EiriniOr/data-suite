@@ -45,6 +45,34 @@ st.set_page_config(
 inject_css()
 
 
+# ── Login gate ────────────────────────────────────────────────────────────────
+def _check_login() -> bool:
+    """Return True if user is authenticated. Gate the whole app behind a login form."""
+    if st.session_state.get("authenticated"):
+        return True
+
+    st.markdown(
+        "<h2 style='text-align:center;margin-top:3rem;'>Miss Datrix</h2>"
+        "<p style='text-align:center;color:#94a3b8;margin-bottom:2rem;'>Invite-only access</p>",
+        unsafe_allow_html=True,
+    )
+    col = st.columns([1, 1.2, 1])[1]
+    with col:
+        username = st.text_input("Username", key="_login_user")
+        password = st.text_input("Password", type="password", key="_login_pass")
+        if st.button("Sign in", use_container_width=True):
+            users: dict = st.secrets.get("users", {})
+            if username in users and users[username] == password:
+                st.session_state.authenticated = True
+                st.rerun()
+            else:
+                st.error("Invalid credentials.")
+    st.stop()
+
+
+_check_login()
+
+
 # ── Session state init ────────────────────────────────────────────────────────
 def _init_state():
     defaults = {
