@@ -48,109 +48,409 @@ inject_css()
 # ── Login gate ────────────────────────────────────────────────────────────────
 _LOGIN_HTML = """
 <style>
-.md-wrap{max-width:860px;margin:1.5rem auto 0.5rem;display:grid;grid-template-columns:1fr 1.1fr;gap:2rem;align-items:start;padding:0 1rem}
-.md-left{text-align:center}
-.md-logo{font-size:2.1rem;font-weight:900;background:linear-gradient(135deg,#06b6d4,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:0;letter-spacing:-.02em}
-.md-tagline{color:#64748b;font-size:.85rem;margin:.2rem 0 1rem}
-.md-label{color:#475569;font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;margin-bottom:.6rem}
-.md-carousel{background:linear-gradient(135deg,rgba(30,27,75,.6),rgba(15,15,45,.85));border:1px solid rgba(124,58,237,.25);border-radius:14px;padding:1.4rem;position:relative}
-.md-track{position:relative;min-height:130px}
-.md-slide{position:absolute;top:0;left:0;right:0;opacity:0;animation:mdc 36s infinite}
-.md-slide:nth-child(1){animation-delay:0s}
-.md-slide:nth-child(2){animation-delay:6s}
-.md-slide:nth-child(3){animation-delay:12s}
-.md-slide:nth-child(4){animation-delay:18s}
-.md-slide:nth-child(5){animation-delay:24s}
-.md-slide:nth-child(6){animation-delay:30s}
-@keyframes mdc{0%{opacity:0;transform:translateY(6px)}4%{opacity:1;transform:translateY(0)}14%{opacity:1;transform:translateY(0)}18%{opacity:0;transform:translateY(-6px)}100%{opacity:0}}
-.md-sicon{font-size:1.5rem;margin-bottom:.35rem}
-.md-stitle{color:#e2e8f0;font-size:.93rem;font-weight:700;margin-bottom:.28rem}
-.md-sdesc{color:#94a3b8;font-size:.8rem;line-height:1.55}
-.md-sdesc b{color:#22d3ee}
-.md-vs{display:inline-block;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.35);color:#fbbf24;font-size:.65rem;padding:1px 7px;border-radius:999px;margin-bottom:.3rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
-.md-dots{display:flex;justify-content:center;gap:5px;margin-top:.9rem}
-.md-dot{width:6px;height:6px;border-radius:50%;background:rgba(124,58,237,.25);animation:mdd 36s infinite}
-.md-dot:nth-child(1){animation-delay:0s}.md-dot:nth-child(2){animation-delay:6s}.md-dot:nth-child(3){animation-delay:12s}
-.md-dot:nth-child(4){animation-delay:18s}.md-dot:nth-child(5){animation-delay:24s}.md-dot:nth-child(6){animation-delay:30s}
-@keyframes mdd{0%,2%{background:rgba(124,58,237,.25);transform:scale(1)}4%,14%{background:#7c3aed;transform:scale(1.4)}18%,100%{background:rgba(124,58,237,.25);transform:scale(1)}}
-@media(max-width:600px){.md-wrap{grid-template-columns:1fr}}
+/* Hide Streamlit chrome on login */
+section[data-testid="stSidebar"]{display:none!important}
+[data-testid="stHeader"],[data-testid="stToolbar"],[data-testid="stDecoration"]{display:none!important}
+.stDeployButton{display:none!important}
+.block-container{padding:0!important;max-width:100%!important}
+
+/* Page layout */
+.mdx-page{
+  display:grid;
+  grid-template-columns:380px 1fr;
+  min-height:88vh;
+  max-width:1180px;
+  margin:0 auto;
+  padding:2.5rem 2.5rem 0;
+  gap:4rem;
+  align-items:center;
+  box-sizing:border-box;
+}
+
+/* ── Left: character ── */
+.mdx-left{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:.75rem;
+}
+.mdx-char{
+  filter:drop-shadow(0 0 36px rgba(124,58,237,.5)) drop-shadow(0 0 72px rgba(6,182,212,.18));
+  animation:mdx-float 6s ease-in-out infinite;
+}
+@keyframes mdx-float{
+  0%,100%{transform:translateY(0)}
+  50%{transform:translateY(-10px)}
+}
+.mdx-char-label{
+  font-size:.7rem;color:#334155;letter-spacing:.14em;text-transform:uppercase;
+  font-family:monospace;margin-top:.25rem;
+}
+
+/* ── Right: brand + carousel ── */
+.mdx-right{display:flex;flex-direction:column;gap:1.6rem}
+
+.mdx-title{
+  font-size:3.8rem;font-weight:900;line-height:.95;letter-spacing:-.04em;margin:0;
+  background:linear-gradient(135deg,#22d3ee 0%,#a78bfa 45%,#f472b6 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.mdx-sub{color:#475569;font-size:.95rem;margin:.5rem 0 0;letter-spacing:.01em;line-height:1.5}
+.mdx-sub b{color:#7c3aed;font-weight:600}
+
+/* ── Carousel ── */
+.mdx-car{
+  background:linear-gradient(145deg,rgba(30,27,75,.8) 0%,rgba(7,7,26,.95) 100%);
+  border:1px solid rgba(124,58,237,.28);
+  border-radius:22px;padding:2rem 2.2rem 1.6rem;
+  position:relative;overflow:hidden;
+  box-shadow:0 0 0 1px rgba(6,182,212,.06) inset,0 8px 60px rgba(124,58,237,.14),0 2px 8px rgba(0,0,0,.4);
+}
+.mdx-car::before{
+  content:'';position:absolute;top:-80px;right:-80px;
+  width:280px;height:280px;border-radius:50%;
+  background:radial-gradient(circle,rgba(124,58,237,.14) 0%,transparent 70%);
+  pointer-events:none;
+}
+.mdx-car::after{
+  content:'';position:absolute;bottom:-60px;left:-40px;
+  width:200px;height:200px;border-radius:50%;
+  background:radial-gradient(circle,rgba(6,182,212,.08) 0%,transparent 70%);
+  pointer-events:none;
+}
+
+/* Slide counter badge */
+.mdx-badge-wrap{
+  display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem;
+}
+.mdx-section-lbl{
+  font-size:.68rem;text-transform:uppercase;letter-spacing:.14em;color:#475569;font-family:monospace;
+}
+
+/* Track + slides */
+.mdx-track{position:relative;min-height:160px}
+.mdx-slide{
+  position:absolute;top:0;left:0;right:0;
+  opacity:0;
+  animation:mdx-cycle 36s infinite;
+  display:flex;align-items:flex-start;gap:1.2rem;
+}
+.mdx-slide:nth-child(1){animation-delay:0s}
+.mdx-slide:nth-child(2){animation-delay:6s}
+.mdx-slide:nth-child(3){animation-delay:12s}
+.mdx-slide:nth-child(4){animation-delay:18s}
+.mdx-slide:nth-child(5){animation-delay:24s}
+.mdx-slide:nth-child(6){animation-delay:30s}
+@keyframes mdx-cycle{
+  0%{opacity:0;transform:translateX(14px)}
+  3%{opacity:1;transform:translateX(0)}
+  14%{opacity:1;transform:translateX(0)}
+  17%,100%{opacity:0;transform:translateX(-10px)}
+}
+
+/* Icon box */
+.mdx-icon{
+  width:54px;height:54px;flex-shrink:0;border-radius:14px;
+  display:flex;align-items:center;justify-content:center;font-size:1.75rem;
+  background:rgba(124,58,237,.15);
+  border:1px solid rgba(124,58,237,.3);
+  box-shadow:0 0 20px rgba(124,58,237,.15);
+}
+.mdx-icon.cyan{background:rgba(6,182,212,.12);border-color:rgba(6,182,212,.25);box-shadow:0 0 20px rgba(6,182,212,.1)}
+.mdx-icon.pink{background:rgba(244,114,182,.1);border-color:rgba(244,114,182,.22);box-shadow:0 0 20px rgba(244,114,182,.08)}
+.mdx-icon.amber{background:rgba(251,191,36,.1);border-color:rgba(251,191,36,.22);box-shadow:0 0 20px rgba(251,191,36,.08)}
+
+/* Slide text */
+.mdx-stitle{color:#f1f5f9;font-size:1.15rem;font-weight:800;margin:0 0 .45rem;letter-spacing:-.015em}
+.mdx-sdesc{color:#94a3b8;font-size:.85rem;line-height:1.65;margin:0}
+.mdx-sdesc b{color:#22d3ee;font-weight:600}
+.mdx-sdesc em{color:#c084fc;font-style:normal}
+.mdx-vs{
+  display:inline-flex;align-items:center;gap:4px;
+  background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.3);
+  color:#fbbf24;font-size:.65rem;padding:2px 9px;border-radius:999px;
+  margin-bottom:.4rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+}
+
+/* Progress bars */
+.mdx-prog{display:flex;gap:6px;margin-top:1.4rem}
+.mdx-bar{flex:1;height:3px;border-radius:2px;background:rgba(124,58,237,.18);overflow:hidden;position:relative}
+.mdx-bar::after{
+  content:'';position:absolute;top:0;left:0;height:100%;width:0%;
+  border-radius:2px;background:linear-gradient(90deg,#7c3aed,#22d3ee);
+  animation:mdx-fill 36s linear infinite;
+}
+.mdx-bar:nth-child(1)::after{animation-delay:0s}
+.mdx-bar:nth-child(2)::after{animation-delay:6s}
+.mdx-bar:nth-child(3)::after{animation-delay:12s}
+.mdx-bar:nth-child(4)::after{animation-delay:18s}
+.mdx-bar:nth-child(5)::after{animation-delay:24s}
+.mdx-bar:nth-child(6)::after{animation-delay:30s}
+@keyframes mdx-fill{
+  0%{width:0%}14%{width:100%}16%{width:100%}17%,100%{width:0%}
+}
+
+/* Style Streamlit form inputs on login page */
+.stTextInput>div>div>input{
+  background:rgba(15,15,45,.85)!important;
+  border:1px solid rgba(124,58,237,.3)!important;
+  border-radius:10px!important;color:#e2e8f0!important;
+  font-size:.9rem!important;
+  box-shadow:none!important;
+}
+.stTextInput>div>div>input:focus{
+  border-color:#7c3aed!important;
+  box-shadow:0 0 0 2px rgba(124,58,237,.25)!important;
+}
+.stTextInput label{color:#64748b!important;font-size:.8rem!important;letter-spacing:.04em!important}
+.stButton>button{
+  background:linear-gradient(135deg,#7c3aed,#0891b2)!important;
+  border:none!important;border-radius:10px!important;
+  font-weight:700!important;letter-spacing:.06em!important;
+  font-size:.9rem!important;transition:opacity .2s!important;
+  box-shadow:0 4px 20px rgba(124,58,237,.3)!important;
+}
+.stButton>button:hover{opacity:.88!important}
+.stAlert{border-radius:10px!important}
+
+@media(max-width:820px){
+  .mdx-page{grid-template-columns:1fr;min-height:auto;padding:1.5rem}
+  .mdx-title{font-size:2.6rem}
+}
 </style>
-<div class="md-wrap">
-  <div class="md-left">
-    <p class="md-logo">✦ Miss Datrix</p>
-    <p class="md-tagline">Your AI-powered data science advisor</p>
-    <svg width="200" height="252" viewBox="0 0 200 252" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <radialGradient id="aura" cx="50%" cy="60%" r="50%"><stop offset="0%" stop-color="#7c3aed" stop-opacity=".45"/><stop offset="100%" stop-color="#07071a" stop-opacity="0"/></radialGradient>
-        <linearGradient id="sk" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fcd5b5"/><stop offset="100%" stop-color="#f4a472"/></linearGradient>
-        <linearGradient id="hr" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#4c1d95"/><stop offset="60%" stop-color="#6d28d9"/><stop offset="100%" stop-color="#0369a1"/></linearGradient>
-        <linearGradient id="ot" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1e1b4b"/><stop offset="100%" stop-color="#07071a"/></linearGradient>
-      </defs>
-      <ellipse cx="100" cy="145" rx="88" ry="95" fill="url(#aura)"/>
-      <g transform="translate(148,52)" opacity=".8">
-        <rect width="42" height="32" rx="4" fill="rgba(10,10,35,.85)" stroke="#6d28d9" stroke-width="1"/>
-        <polyline points="5,25 13,16 21,20 30,9 37,13" fill="none" stroke="#06b6d4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        <circle cx="37" cy="13" r="2" fill="#06b6d4"/>
-      </g>
-      <g transform="translate(8,58)" opacity=".75">
-        <circle cx="6" cy="10" r="3.5" fill="#7c3aed"/><circle cx="6" cy="22" r="3.5" fill="#7c3aed"/>
-        <circle cx="20" cy="4" r="3.5" fill="#06b6d4"/><circle cx="20" cy="16" r="3.5" fill="#06b6d4"/><circle cx="20" cy="28" r="3.5" fill="#06b6d4"/>
-        <circle cx="34" cy="10" r="3.5" fill="#a78bfa"/><circle cx="34" cy="22" r="3.5" fill="#a78bfa"/>
-        <line x1="9.5" y1="10" x2="16.5" y2="4" stroke="#4c1d95" stroke-width=".8"/><line x1="9.5" y1="10" x2="16.5" y2="16" stroke="#4c1d95" stroke-width=".8"/>
-        <line x1="9.5" y1="22" x2="16.5" y2="16" stroke="#4c1d95" stroke-width=".8"/><line x1="9.5" y1="22" x2="16.5" y2="28" stroke="#4c1d95" stroke-width=".8"/>
-        <line x1="23.5" y1="4" x2="30.5" y2="10" stroke="#4c1d95" stroke-width=".8"/><line x1="23.5" y1="16" x2="30.5" y2="10" stroke="#4c1d95" stroke-width=".8"/>
-        <line x1="23.5" y1="16" x2="30.5" y2="22" stroke="#4c1d95" stroke-width=".8"/><line x1="23.5" y1="28" x2="30.5" y2="22" stroke="#4c1d95" stroke-width=".8"/>
-      </g>
-      <text x="152" y="104" font-size="11" fill="#fbbf24" opacity=".9">✦</text>
-      <text x="42" y="98" font-size="7" fill="#a78bfa" opacity=".7">✦</text>
-      <path d="M55 250 Q52 215 44 198 Q68 183 100 181 Q132 183 156 198 Q148 215 145 250Z" fill="url(#ot)"/>
-      <path d="M93 183 L100 200 L107 183" fill="none" stroke="#7c3aed" stroke-width="1.5"/>
-      <rect x="90" y="167" width="20" height="18" rx="5" fill="url(#sk)"/>
-      <ellipse cx="100" cy="138" rx="46" ry="50" fill="url(#hr)"/>
-      <ellipse cx="100" cy="142" rx="38" ry="41" fill="url(#sk)"/>
-      <path d="M62 122 Q64 90 82 83 Q100 77 118 83 Q136 90 138 122 Q124 112 100 110 Q76 112 62 122Z" fill="url(#hr)"/>
-      <path d="M64 135 Q54 148 56 172 Q61 185 68 183 Q62 164 66 145Z" fill="url(#hr)"/>
-      <path d="M136 135 Q146 148 144 172 Q139 185 132 183 Q138 164 134 145Z" fill="url(#hr)"/>
-      <ellipse cx="62" cy="148" rx="7" ry="9" fill="url(#sk)"/><ellipse cx="138" cy="148" rx="7" ry="9" fill="url(#sk)"/>
-      <ellipse cx="62" cy="148" rx="4" ry="6" fill="#e8a472"/><ellipse cx="138" cy="148" rx="4" ry="6" fill="#e8a472"/>
-      <path d="M80 127 Q88 123 96 125" fill="none" stroke="#3b0764" stroke-width="2.2" stroke-linecap="round"/>
-      <path d="M104 125 Q112 123 120 127" fill="none" stroke="#3b0764" stroke-width="2.2" stroke-linecap="round"/>
-      <rect x="74" y="131" width="22" height="16" rx="5" fill="rgba(6,182,212,.08)" stroke="#06b6d4" stroke-width="1.8"/>
-      <rect x="102" y="131" width="22" height="16" rx="5" fill="rgba(6,182,212,.08)" stroke="#06b6d4" stroke-width="1.8"/>
-      <line x1="96" y1="139" x2="102" y2="139" stroke="#06b6d4" stroke-width="1.8"/>
-      <line x1="74" y1="139" x2="68" y2="140" stroke="#06b6d4" stroke-width="1.5"/>
-      <line x1="124" y1="139" x2="130" y2="140" stroke="#06b6d4" stroke-width="1.5"/>
-      <circle cx="85" cy="139" r="4.5" fill="#1e0040"/><circle cx="113" cy="139" r="4.5" fill="#1e0040"/>
-      <circle cx="85" cy="139" r="2.8" fill="#4c1d95"/><circle cx="113" cy="139" r="2.8" fill="#4c1d95"/>
-      <circle cx="86.5" cy="137.5" r="1.6" fill="white"/><circle cx="114.5" cy="137.5" r="1.6" fill="white"/>
-      <path d="M97 153 Q100 159 103 153" fill="none" stroke="#c97c50" stroke-width="1.3" stroke-linecap="round"/>
-      <path d="M88 165 Q100 174 112 165" fill="none" stroke="#c97c50" stroke-width="1.8" stroke-linecap="round"/>
-      <ellipse cx="80" cy="162" rx="7" ry="4" fill="#f4a4a4" opacity=".28"/><ellipse cx="120" cy="162" rx="7" ry="4" fill="#f4a4a4" opacity=".28"/>
-      <path d="M84 83 Q100 79 114 85 Q108 91 100 90 Q93 90 84 83Z" fill="white" opacity=".14"/>
-      <g transform="translate(62,210)">
-        <rect width="76" height="46" rx="5" fill="#0d0b20" stroke="#4c1d95" stroke-width="1.5"/>
-        <rect x="3" y="3" width="70" height="40" rx="3" fill="#07071a"/>
-        <rect x="10" y="30" width="7" height="8" fill="#7c3aed" opacity=".9"/>
-        <rect x="19" y="23" width="7" height="15" fill="#06b6d4" opacity=".9"/>
-        <rect x="28" y="16" width="7" height="22" fill="#7c3aed" opacity=".9"/>
-        <rect x="37" y="20" width="7" height="18" fill="#a78bfa" opacity=".9"/>
-        <rect x="46" y="11" width="7" height="27" fill="#06b6d4" opacity=".9"/>
-        <line x1="6" y1="38" x2="58" y2="38" stroke="#1e293b" stroke-width=".8"/>
-      </g>
-    </svg>
+
+<div class="mdx-page">
+
+  <!-- ── LEFT: Miss Datrix character ── -->
+  <div class="mdx-left">
+    <div class="mdx-char">
+      <svg width="300" height="378" viewBox="0 0 200 252" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="gAura" cx="50%" cy="60%" r="50%">
+            <stop offset="0%" stop-color="#7c3aed" stop-opacity=".5"/>
+            <stop offset="70%" stop-color="#0369a1" stop-opacity=".2"/>
+            <stop offset="100%" stop-color="#07071a" stop-opacity="0"/>
+          </radialGradient>
+          <linearGradient id="gSkin" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#fcd5b5"/><stop offset="100%" stop-color="#f4a472"/>
+          </linearGradient>
+          <linearGradient id="gHair" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#3b0764"/><stop offset="55%" stop-color="#6d28d9"/><stop offset="100%" stop-color="#0369a1"/>
+          </linearGradient>
+          <linearGradient id="gOutfit" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#1e1b4b"/><stop offset="100%" stop-color="#07071a"/>
+          </linearGradient>
+          <linearGradient id="gScreen" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#0f0b25"/><stop offset="100%" stop-color="#07071a"/>
+          </linearGradient>
+          <filter id="glow"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+
+        <!-- Aura -->
+        <ellipse cx="100" cy="148" rx="92" ry="100" fill="url(#gAura)"/>
+
+        <!-- Floating: line chart card top-right -->
+        <g transform="translate(150,46)" opacity=".85" filter="url(#glow)">
+          <rect width="44" height="34" rx="5" fill="rgba(8,8,32,.9)" stroke="#6d28d9" stroke-width="1.2"/>
+          <rect x="1" y="1" width="42" height="10" rx="4" fill="rgba(124,58,237,.18)"/>
+          <text x="4" y="9" font-size="5" fill="#a78bfa" font-family="monospace">accuracy</text>
+          <polyline points="4,27 11,20 18,23 26,12 36,16 41,10" fill="none" stroke="#06b6d4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="41" cy="10" r="2.2" fill="#06b6d4"/>
+        </g>
+
+        <!-- Floating: neural net top-left -->
+        <g transform="translate(4,54)" opacity=".8">
+          <circle cx="6"  cy="10" r="4" fill="#7c3aed" filter="url(#glow)"/>
+          <circle cx="6"  cy="23" r="4" fill="#7c3aed" filter="url(#glow)"/>
+          <circle cx="21" cy="4"  r="4" fill="#06b6d4" filter="url(#glow)"/>
+          <circle cx="21" cy="16" r="4" fill="#06b6d4" filter="url(#glow)"/>
+          <circle cx="21" cy="29" r="4" fill="#06b6d4" filter="url(#glow)"/>
+          <circle cx="36" cy="10" r="4" fill="#a78bfa" filter="url(#glow)"/>
+          <circle cx="36" cy="23" r="4" fill="#a78bfa" filter="url(#glow)"/>
+          <line x1="10" y1="10" x2="17" y2="4"  stroke="#4c1d95" stroke-width="1"/>
+          <line x1="10" y1="10" x2="17" y2="16" stroke="#4c1d95" stroke-width="1"/>
+          <line x1="10" y1="23" x2="17" y2="16" stroke="#4c1d95" stroke-width="1"/>
+          <line x1="10" y1="23" x2="17" y2="29" stroke="#4c1d95" stroke-width="1"/>
+          <line x1="25" y1="4"  x2="32" y2="10" stroke="#4c1d95" stroke-width="1"/>
+          <line x1="25" y1="16" x2="32" y2="10" stroke="#4c1d95" stroke-width="1"/>
+          <line x1="25" y1="16" x2="32" y2="23" stroke="#4c1d95" stroke-width="1"/>
+          <line x1="25" y1="29" x2="32" y2="23" stroke="#4c1d95" stroke-width="1"/>
+        </g>
+
+        <!-- Sparkles -->
+        <text x="154" y="108" font-size="12" fill="#fbbf24" opacity=".95" filter="url(#glow)">✦</text>
+        <text x="40"  y="102" font-size="8"  fill="#a78bfa" opacity=".75">✦</text>
+        <text x="170" y="50"  font-size="6"  fill="#22d3ee" opacity=".6">✦</text>
+
+        <!-- Body -->
+        <path d="M54 252 Q50 214 42 196 Q66 181 100 179 Q134 181 158 196 Q150 214 146 252Z" fill="url(#gOutfit)"/>
+        <!-- Collar V -->
+        <path d="M92 181 L100 198 L108 181" fill="none" stroke="#7c3aed" stroke-width="1.8" stroke-linejoin="round"/>
+        <!-- Subtle outfit texture -->
+        <path d="M70 220 Q100 215 130 220" fill="none" stroke="rgba(124,58,237,.25)" stroke-width="1"/>
+
+        <!-- Neck -->
+        <rect x="91" y="166" width="18" height="17" rx="5" fill="url(#gSkin)"/>
+
+        <!-- Hair (back layer) -->
+        <ellipse cx="100" cy="134" rx="47" ry="51" fill="url(#gHair)"/>
+
+        <!-- Face -->
+        <ellipse cx="100" cy="139" rx="39" ry="43" fill="url(#gSkin)"/>
+
+        <!-- Hair front: top wave -->
+        <path d="M61 119 Q63 87 82 80 Q100 74 118 80 Q137 87 139 119 Q126 108 100 106 Q74 108 61 119Z" fill="url(#gHair)"/>
+        <!-- Hair volume sides -->
+        <path d="M63 133 Q52 148 54 174 Q59 188 67 185 Q60 165 65 143Z" fill="url(#gHair)"/>
+        <path d="M137 133 Q148 148 146 174 Q141 188 133 185 Q140 165 135 143Z" fill="url(#gHair)"/>
+        <!-- Hair ends curling slightly -->
+        <path d="M54 174 Q50 190 58 196 Q64 194 67 185" fill="url(#gHair)"/>
+        <path d="M146 174 Q150 190 142 196 Q136 194 133 185" fill="url(#gHair)"/>
+
+        <!-- Ears -->
+        <ellipse cx="61"  cy="145" rx="7" ry="9" fill="url(#gSkin)"/>
+        <ellipse cx="139" cy="145" rx="7" ry="9" fill="url(#gSkin)"/>
+        <ellipse cx="61"  cy="145" rx="4" ry="6" fill="#e8a472"/>
+        <ellipse cx="139" cy="145" rx="4" ry="6" fill="#e8a472"/>
+        <!-- Earrings: small cyan dots -->
+        <circle cx="61"  cy="152" r="2.5" fill="#06b6d4" opacity=".9" filter="url(#glow)"/>
+        <circle cx="139" cy="152" r="2.5" fill="#06b6d4" opacity=".9" filter="url(#glow)"/>
+
+        <!-- Eyebrows (arched, darker) -->
+        <path d="M79 125 Q87 120 96 123" fill="none" stroke="#2d1050" stroke-width="2.4" stroke-linecap="round"/>
+        <path d="M104 123 Q113 120 121 125" fill="none" stroke="#2d1050" stroke-width="2.4" stroke-linecap="round"/>
+
+        <!-- Glasses: rectangular frames -->
+        <rect x="74" y="129" width="23" height="17" rx="5" fill="rgba(6,182,212,.09)" stroke="#06b6d4" stroke-width="2" filter="url(#glow)"/>
+        <rect x="103" y="129" width="23" height="17" rx="5" fill="rgba(6,182,212,.09)" stroke="#06b6d4" stroke-width="2" filter="url(#glow)"/>
+        <!-- Bridge + arms -->
+        <line x1="97"  y1="137" x2="103" y2="137" stroke="#06b6d4" stroke-width="2"/>
+        <line x1="74"  y1="137" x2="68"  y2="138" stroke="#06b6d4" stroke-width="1.6"/>
+        <line x1="126" y1="137" x2="132" y2="138" stroke="#06b6d4" stroke-width="1.6"/>
+
+        <!-- Eyes -->
+        <circle cx="85"  cy="137" r="5"   fill="#100030"/>
+        <circle cx="114" cy="137" r="5"   fill="#100030"/>
+        <circle cx="85"  cy="137" r="3.2" fill="#4c1d95"/>
+        <circle cx="114" cy="137" r="3.2" fill="#4c1d95"/>
+        <!-- Catchlight -->
+        <circle cx="86.8" cy="135.2" r="1.8" fill="white"/>
+        <circle cx="115.8" cy="135.2" r="1.8" fill="white"/>
+
+        <!-- Nose bridge -->
+        <path d="M97 150 Q100 157 103 150" fill="none" stroke="#c97c50" stroke-width="1.4" stroke-linecap="round"/>
+
+        <!-- Smile + lip -->
+        <path d="M87 163 Q100 173 113 163" fill="none" stroke="#c9735a" stroke-width="2" stroke-linecap="round"/>
+        <!-- Lip highlight -->
+        <path d="M94 160 Q100 157 106 160" fill="none" stroke="#e8956a" stroke-width="1.2" stroke-linecap="round"/>
+
+        <!-- Cheek blush -->
+        <ellipse cx="79"  cy="158" rx="8" ry="5" fill="#f9a8a8" opacity=".28"/>
+        <ellipse cx="121" cy="158" rx="8" ry="5" fill="#f9a8a8" opacity=".28"/>
+
+        <!-- Hair sheen highlight -->
+        <path d="M83 80 Q100 75 115 82 Q108 89 100 88 Q92 88 83 80Z" fill="white" opacity=".16"/>
+
+        <!-- Laptop -->
+        <g transform="translate(60,208)">
+          <!-- Lid -->
+          <rect width="80" height="50" rx="6" fill="#0c0a22" stroke="#4c1d95" stroke-width="1.8"/>
+          <!-- Screen bezel -->
+          <rect x="3" y="3" width="74" height="44" rx="4" fill="url(#gScreen)"/>
+          <!-- Screen glow tint -->
+          <rect x="3" y="3" width="74" height="44" rx="4" fill="rgba(124,58,237,.06)"/>
+          <!-- Chart bars on screen -->
+          <rect x="10" y="32" width="8" height="9"  fill="#7c3aed" opacity=".95"/>
+          <rect x="20" y="25" width="8" height="16" fill="#06b6d4" opacity=".95"/>
+          <rect x="30" y="17" width="8" height="24" fill="#7c3aed" opacity=".95"/>
+          <rect x="40" y="21" width="8" height="20" fill="#a78bfa" opacity=".95"/>
+          <rect x="50" y="12" width="8" height="29" fill="#06b6d4" opacity=".95"/>
+          <rect x="60" y="19" width="8" height="22" fill="#f472b6" opacity=".9"/>
+          <!-- Axis -->
+          <line x1="7" y1="41" x2="72" y2="41" stroke="#1e293b" stroke-width="1"/>
+          <!-- Cursor line -->
+          <line x1="47" y1="4" x2="47" y2="40" stroke="rgba(6,182,212,.2)" stroke-width="1" stroke-dasharray="2,2"/>
+          <!-- Label -->
+          <text x="11" y="10" font-size="5" fill="#475569" font-family="monospace">model scores</text>
+        </g>
+        <!-- Laptop base/trackpad -->
+        <rect x="56" y="257" width="88" height="6" rx="3" fill="#0a0820" stroke="#2d1b5e" stroke-width="1"/>
+        <rect x="85" y="259" width="30" height="3" rx="1.5" fill="rgba(124,58,237,.25)"/>
+      </svg>
+    </div>
+    <p class="mdx-char-label">Miss Datrix · AI Data Advisor</p>
   </div>
-  <div>
-    <div class="md-label">What Miss Datrix does</div>
-    <div class="md-carousel">
-      <div class="md-track">
-        <div class="md-slide"><div class="md-sicon">📂</div><div class="md-stitle">Upload Any Dataset</div><div class="md-sdesc">CSV, Excel, or Parquet. Reads the schema, detects time series, and <b>proposes a workflow tailored to your goal</b> — not a fixed template.</div></div>
-        <div class="md-slide"><div class="md-sicon">🤖</div><div class="md-stitle">Real Model Training</div><div class="md-sdesc">Benchmarks RF, XGBoost, LightGBM, SVM, Logistic/Ridge with <b>5-fold cross-validation</b>. Ranked leaderboard. You pick the winner.</div></div>
-        <div class="md-slide"><div class="md-sicon">⚙️</div><div class="md-stitle">Optuna Hyperparameter Tuning</div><div class="md-sdesc"><b>Bayesian search</b> — smarter than grid search. Runs 100s of trials, shows improvement curve, reveals what each hyperparameter actually does.</div></div>
-        <div class="md-slide"><div class="md-sicon">🔍</div><div class="md-stitle">SHAP Explainability</div><div class="md-sdesc">Computes <b>real SHAP values</b> on your model. Feature importance, confusion matrix, ROC curve, residual plots, downloadable HTML report.</div></div>
-        <div class="md-slide"><div class="md-sicon">🧪</div><div class="md-stitle">A/B Testing & Causal Inference</div><div class="md-sdesc">Beyond correlation. Welch/chi-square tests, <b>propensity score matching</b>, IPW, ATE with bootstrap SE, covariate balance analysis.</div></div>
-        <div class="md-slide"><div class="md-vs">vs Claude.ai</div><div class="md-stitle">Not Just a Chatbot</div><div class="md-sdesc">Claude.ai <em>talks</em> about your data. Miss Datrix <b>runs real code on it</b> — trains models you can download, computes actual SHAP, runs Optuna, scales to large files.</div></div>
+
+  <!-- ── RIGHT: brand + carousel ── -->
+  <div class="mdx-right">
+    <div>
+      <h1 class="mdx-title">✦ Miss Datrix</h1>
+      <p class="mdx-sub">Your AI-powered data science suite.<br><b>Upload data. Get real insights.</b></p>
+    </div>
+
+    <div class="mdx-car">
+      <div class="mdx-badge-wrap">
+        <span class="mdx-section-lbl">What Miss Datrix does</span>
       </div>
-      <div class="md-dots"><div class="md-dot"></div><div class="md-dot"></div><div class="md-dot"></div><div class="md-dot"></div><div class="md-dot"></div><div class="md-dot"></div></div>
+
+      <div class="mdx-track">
+        <!-- 1 -->
+        <div class="mdx-slide">
+          <div class="mdx-icon cyan">📂</div>
+          <div>
+            <p class="mdx-stitle">Upload Any Dataset</p>
+            <p class="mdx-sdesc">CSV, Excel, or Parquet. Reads the schema, detects time series automatically, and <b>proposes a workflow tailored to your stated goal</b> — not a fixed template.</p>
+          </div>
+        </div>
+        <!-- 2 -->
+        <div class="mdx-slide">
+          <div class="mdx-icon">🤖</div>
+          <div>
+            <p class="mdx-stitle">Real Model Training</p>
+            <p class="mdx-sdesc">Benchmarks RF, XGBoost, LightGBM, SVM, Logistic/Ridge with <b>5-fold cross-validation</b>. Ranked leaderboard by AUC, F1, or RMSE. You pick the winner.</p>
+          </div>
+        </div>
+        <!-- 3 -->
+        <div class="mdx-slide">
+          <div class="mdx-icon pink">⚙️</div>
+          <div>
+            <p class="mdx-stitle">Optuna Hyperparameter Tuning</p>
+            <p class="mdx-sdesc"><b>Bayesian search</b> — smarter than grid search. Runs 100s of trials, shows an improvement curve, and reveals what each parameter actually controls.</p>
+          </div>
+        </div>
+        <!-- 4 -->
+        <div class="mdx-slide">
+          <div class="mdx-icon cyan">🔍</div>
+          <div>
+            <p class="mdx-stitle">SHAP Explainability</p>
+            <p class="mdx-sdesc">Computes <b>real SHAP values</b> on your trained model. Feature importance, confusion matrix, ROC curve, residuals — plus a downloadable HTML report.</p>
+          </div>
+        </div>
+        <!-- 5 -->
+        <div class="mdx-slide">
+          <div class="mdx-icon pink">🧪</div>
+          <div>
+            <p class="mdx-stitle">A/B Testing & Causal Inference</p>
+            <p class="mdx-sdesc">Beyond correlation. Welch / chi-square tests, Cohen's d, <b>propensity score matching</b>, IPW, ATE with bootstrap SE, covariate balance (SMD).</p>
+          </div>
+        </div>
+        <!-- 6 -->
+        <div class="mdx-slide">
+          <div class="mdx-icon amber">⚡</div>
+          <div>
+            <span class="mdx-vs">vs Claude.ai</span>
+            <p class="mdx-stitle">Not Just a Chatbot</p>
+            <p class="mdx-sdesc">Claude.ai <em>talks about</em> your data. Miss Datrix <b>runs real Python on it</b> — trains and downloads models, computes actual SHAP, runs Optuna, exports styled HTML reports.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Progress bars -->
+      <div class="mdx-prog">
+        <div class="mdx-bar"></div><div class="mdx-bar"></div><div class="mdx-bar"></div>
+        <div class="mdx-bar"></div><div class="mdx-bar"></div><div class="mdx-bar"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -163,11 +463,17 @@ def _check_login() -> bool:
         return True
 
     st.markdown(_LOGIN_HTML, unsafe_allow_html=True)
-    _, col, _ = st.columns([1, 1, 1])
+    st.markdown("<div style='height:1.2rem'></div>", unsafe_allow_html=True)
+    _, col, _ = st.columns([1, 0.9, 1])
     with col:
-        username = st.text_input("Username", key="_login_user")
-        password = st.text_input("Password", type="password", key="_login_pass")
-        if st.button("Sign in", use_container_width=True):
+        username = st.text_input(
+            "Username", key="_login_user", placeholder="your username"
+        )
+        password = st.text_input(
+            "Password", type="password", key="_login_pass", placeholder="••••••••"
+        )
+        st.markdown("<div style='height:.3rem'></div>", unsafe_allow_html=True)
+        if st.button("Sign in →", use_container_width=True):
             users: dict = st.secrets.get("users", {})
             if username in users and users[username] == password:
                 st.session_state.authenticated = True
