@@ -7,6 +7,7 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 import streamlit as st
+import streamlit.components.v1 as _components
 from styles import inject_css, page_header, ai_panel_html, COMPARISON_HTML
 
 from pipeline.loader import load_file, infer_task_type, DatasetMeta
