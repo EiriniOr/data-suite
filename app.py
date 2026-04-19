@@ -545,7 +545,7 @@ if st.session_state.stage == "upload":
         """,
             unsafe_allow_html=True,
         )
-        mode_col1, mode_col2, mode_col3 = st.columns(3, gap="medium")
+        mode_col1, mode_col2, mode_col3, mode_col4 = st.columns(4, gap="medium")
         with mode_col1:
             st.markdown(
                 """<div class="datrix-card" style="text-align:center;cursor:pointer">
@@ -573,14 +573,24 @@ if st.session_state.stage == "upload":
                 </div>""",
                 unsafe_allow_html=True,
             )
+        with mode_col4:
+            st.markdown(
+                """<div class="datrix-card" style="text-align:center;cursor:pointer">
+                <div style="font-size:1.5rem;margin-bottom:0.5rem">🧭</div>
+                <div style="font-weight:600;color:#e2e8f0;margin-bottom:0.25rem">Model Advisor</div>
+                <div style="font-size:0.8rem;color:#64748b">Decision tree → model + loss + metrics</div>
+                </div>""",
+                unsafe_allow_html=True,
+            )
 
         selected_mode = st.radio(
             "Mode",
-            ["ml_pipeline", "ab_test", "causal"],
+            ["ml_pipeline", "ab_test", "causal", "model_advisor"],
             format_func=lambda m: {
                 "ml_pipeline": "🤖 ML Pipeline",
                 "ab_test": "🧪 A/B Test",
                 "causal": "🔍 Causal Analysis",
+                "model_advisor": "🧭 Model Advisor",
             }[m],
             horizontal=True,
             label_visibility="collapsed",
@@ -592,25 +602,43 @@ if st.session_state.stage == "upload":
         col1, col2 = st.columns([3, 2], gap="large")
         with col1:
             st.markdown('<div class="datrix-card">', unsafe_allow_html=True)
-            uploaded = st.file_uploader(
-                "Drop your dataset here",
-                type=["csv", "xlsx", "xls", "parquet"],
-                label_visibility="visible",
-            )
-            if selected_mode == "ml_pipeline":
-                user_goal = st.text_area(
-                    "What do you want to do?",
-                    placeholder='e.g. "predict customer churn" · "just explore" · "I don\'t know"',
-                    height=90,
-                    key="user_goal_input",
+            if selected_mode == "model_advisor":
+                st.markdown(
+                    "<div style='padding:1.5rem 0;text-align:center;color:#94a3b8'>"
+                    "<div style='font-size:2.5rem;margin-bottom:0.75rem'>🧭</div>"
+                    "<div style='font-weight:600;color:#e2e8f0;margin-bottom:0.5rem'>Model Advisor</div>"
+                    "<div style='font-size:0.88rem'>Answer a few questions about your problem — "
+                    "get a tailored recommendation for model, loss function, and metrics.</div>"
+                    "</div>",
+                    unsafe_allow_html=True,
                 )
-            if uploaded:
+                uploaded = None
                 st.button(
-                    "✦ Start Analysis",
+                    "🧭 Launch Advisor →",
                     type="primary",
                     use_container_width=True,
-                    key="start_btn",
+                    key="start_advisor_btn",
                 )
+            else:
+                uploaded = st.file_uploader(
+                    "Drop your dataset here",
+                    type=["csv", "xlsx", "xls", "parquet"],
+                    label_visibility="visible",
+                )
+                if selected_mode == "ml_pipeline":
+                    user_goal = st.text_area(
+                        "What do you want to do?",
+                        placeholder='e.g. "predict customer churn" · "just explore" · "I don\'t know"',
+                        height=90,
+                        key="user_goal_input",
+                    )
+                if uploaded:
+                    st.button(
+                        "✦ Start Analysis",
+                        type="primary",
+                        use_container_width=True,
+                        key="start_btn",
+                    )
             st.markdown("</div>", unsafe_allow_html=True)
 
         with col2:
@@ -636,6 +664,13 @@ if st.session_state.stage == "upload":
 
         # Comparison table
         st.markdown(COMPARISON_HTML, unsafe_allow_html=True)
+
+        if selected_mode == "model_advisor" and st.session_state.get(
+            "start_advisor_btn"
+        ):
+            st.session_state.mode = "model_advisor"
+            st.session_state.advisor_answers = {}
+            go_to("model_advisor")
 
         if uploaded and st.session_state.get("start_btn"):
             with st.spinner("Loading file..."):
@@ -1683,3 +1718,390 @@ elif st.session_state.stage == "causal":
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# MODEL ADVISOR STAGE
+# ════════════════════════════════════════════════════════════════════════════════
+elif st.session_state.stage == "model_advisor":
+    page_header(
+        "Model Advisor",
+        "Find the right model for your problem",
+        "Answer each question — the recommendation updates as you go",
+    )
+
+    if "advisor_answers" not in st.session_state:
+        st.session_state.advisor_answers = {}
+    ans = st.session_state.advisor_answers
+
+    def _advisor_q(key, label, options, help_text=None):
+        st.markdown(
+            f'<div style="font-weight:600;color:#e2e8f0;margin:1.2rem 0 0.3rem">{label}</div>',
+            unsafe_allow_html=True,
+        )
+        choice = st.radio(
+            label,
+            options,
+            key=f"advisor_{key}",
+            label_visibility="collapsed",
+            help=help_text,
+        )
+        ans[key] = choice
+        return choice
+
+    def _advisor_recommend(a):
+        pt = a.get("problem_type", "")
+        if "Unsupervised" in pt:
+            goal = a.get("goal", "")
+            if "cluster" in goal.lower():
+                shape = a.get("cluster_shape", "")
+                if "Round" in shape:
+                    return dict(
+                        models=[
+                            ("K-Means", "Round, similar-size clusters — fast and scalable"),
+                            ("Gaussian Mixture Model", "Soft assignments, handles elliptical shapes"),
+                        ],
+                        loss="Inertia (within-cluster SSE)",
+                        primary_metric="Silhouette score",
+                        secondary_metrics=["Elbow plot (inertia vs k)", "Davies-Bouldin index"],
+                        imbalance_strategy=None,
+                        notes=["Use the elbow method to pick k", "Scale features before clustering"],
+                    )
+                elif "Arbitrary" in shape:
+                    return dict(
+                        models=[
+                            ("DBSCAN", "Arbitrary shapes + treats outliers as noise"),
+                            ("HDBSCAN", "Hierarchical version — robust to varying densities"),
+                        ],
+                        loss="None (density-based)",
+                        primary_metric="Silhouette score",
+                        secondary_metrics=["Noise point %", "Number of clusters found"],
+                        imbalance_strategy=None,
+                        notes=["Tune eps and min_samples carefully", "Scale features first"],
+                    )
+                else:
+                    return dict(
+                        models=[
+                            ("Agglomerative Clustering", "Produces a dendrogram — cut at desired depth"),
+                            ("K-Means", "Flat alternative if hierarchy not needed"),
+                        ],
+                        loss="Linkage distance",
+                        primary_metric="Dendrogram cut point / Silhouette score",
+                        secondary_metrics=["Cophenetic correlation"],
+                        imbalance_strategy=None,
+                        notes=["Use Ward linkage for balanced clusters"],
+                    )
+            elif "dimension" in goal.lower():
+                rel = a.get("dim_relationship", "")
+                if "Linear" in rel:
+                    return dict(
+                        models=[("PCA", "Fast, interpretable — explained variance tells you how many components to keep")],
+                        loss="Reconstruction error",
+                        primary_metric="Cumulative explained variance ratio",
+                        secondary_metrics=["Scree plot"],
+                        imbalance_strategy=None,
+                        notes=["Scale features before PCA", "Keep components that explain >= 90-95% variance"],
+                    )
+                else:
+                    return dict(
+                        models=[
+                            ("UMAP", "Preserves global structure — use for downstream ML tasks"),
+                            ("t-SNE", "Better 2D visualization — don't use for downstream tasks"),
+                        ],
+                        loss="KL divergence (t-SNE) / cross-entropy (UMAP)",
+                        primary_metric="Visual cluster separation",
+                        secondary_metrics=["Trustworthiness score"],
+                        imbalance_strategy=None,
+                        notes=["UMAP is faster and more stable — prefer it for ML pipelines"],
+                    )
+            else:
+                return dict(
+                    models=[
+                        ("Isolation Forest", "Fast, scalable — isolates outliers via random splits"),
+                        ("One-Class SVM", "Better for small, clean datasets"),
+                        ("Local Outlier Factor", "Good when anomalies cluster differently from normals"),
+                    ],
+                    loss="Anomaly score (path length / distance)",
+                    primary_metric="AUC-ROC (if labels exist) or Precision@k",
+                    secondary_metrics=["Contamination parameter sensitivity"],
+                    imbalance_strategy=None,
+                    notes=["Set contamination = expected anomaly rate", "Isolation Forest scales best to large data"],
+                )
+        else:
+            output_type = a.get("output_type", "")
+            if "Category" in output_type or "class" in output_type.lower():
+                n_cls = a.get("n_classes", "")
+                imb = a.get("imbalanced", "")
+                probs = a.get("need_probs", "")
+                interp = a.get("interpretability", "")
+                size = a.get("dataset_size", "")
+                is_binary = "Binary" in n_cls
+                is_imb = "Yes" in imb
+                needs_probs = "Yes" in probs
+                needs_interp = "High" in interp
+                is_small = "Small" in size
+                models = []
+                if needs_interp:
+                    models += [
+                        ("Logistic Regression", "Coefficients directly readable — most interpretable"),
+                        ("Decision Tree", "Visual rules — use max_depth to control overfitting"),
+                    ]
+                if is_small:
+                    if not needs_interp:
+                        models += [
+                            ("Logistic Regression", "Low overfitting risk on small datasets"),
+                            ("SVM (RBF kernel)", "Strong on small datasets with clear margins"),
+                        ]
+                else:
+                    models += [
+                        ("LightGBM", "Best default for tabular — fast, handles imbalance, minimal preprocessing"),
+                        ("Random Forest", "Robust baseline, reliable feature importance"),
+                    ]
+                    if not needs_interp:
+                        models += [("XGBoost", "Strong competitor to LightGBM")]
+                if is_imb:
+                    primary = "AUC-PR" if is_binary else "Macro F1"
+                    secondary = ["AUC-ROC", "F1 per class", "Precision@k"]
+                    imb_strategy = "Use class_weight='balanced'. Avoid accuracy — misleading with imbalance."
+                else:
+                    primary = "AUC-ROC" if is_binary else "Macro F1"
+                    secondary = ["AUC-PR", "F1", "Log loss"]
+                    imb_strategy = None
+                notes = []
+                if needs_probs:
+                    notes += [
+                        "Calibrate with CalibratedClassifierCV(method='isotonic')",
+                        "LightGBM with class_weight='balanced' often miscalibrates — check calibration curve",
+                        "Use log loss as a secondary metric to track calibration",
+                    ]
+                else:
+                    notes += ["Tune the decision threshold — don't default to 0.5"]
+                return dict(
+                    models=models,
+                    loss="Binary cross-entropy" if is_binary else "Categorical cross-entropy",
+                    primary_metric=primary,
+                    secondary_metrics=secondary,
+                    imbalance_strategy=imb_strategy,
+                    notes=notes,
+                )
+            else:
+                dist = a.get("target_dist", "")
+                rel = a.get("reg_relationship", "")
+                interp = a.get("reg_interpretability", "")
+                is_skewed = "Skewed" in dist
+                has_outliers = "outlier" in dist.lower()
+                is_linear = "Linear" in rel
+                needs_interp = "High" in interp
+                models = []
+                if needs_interp and is_linear:
+                    models += [
+                        ("Linear Regression", "Coefficients = direct effect — most interpretable"),
+                        ("Ridge / Lasso", "Regularized linear — Lasso does feature selection"),
+                    ]
+                elif needs_interp:
+                    models += [
+                        ("Ridge", "Linear baseline with regularization"),
+                        ("Random Forest", "Non-linear + interpretable via feature importance"),
+                    ]
+                elif is_linear:
+                    models += [
+                        ("Ridge", "Regularized linear"),
+                        ("LightGBM", "Often beats linear models — captures interactions"),
+                    ]
+                else:
+                    models += [
+                        ("LightGBM", "Best default — handles interactions, skew, missing values natively"),
+                        ("XGBoost", "Strong alternative"),
+                        ("Random Forest", "Robust baseline"),
+                    ]
+                if is_skewed:
+                    loss, primary, secondary = (
+                        "MSE on log(y+1) — equivalent to RMSLE",
+                        "RMSLE",
+                        ["MAE", "RMSE on original scale"],
+                    )
+                    notes = [
+                        "Log-transform the target before modeling",
+                        "RMSLE penalises under-prediction more than over-prediction",
+                        "Inverse-transform predictions after training",
+                    ]
+                elif has_outliers:
+                    loss, primary, secondary = "MAE or Huber loss", "MAE", ["RMSE", "R2"]
+                    notes = [
+                        "MSE amplifies outlier errors — prefer MAE or Huber",
+                        "Consider clipping extreme values or quantile regression",
+                    ]
+                else:
+                    loss, primary, secondary = "MSE", "RMSE", ["MAE", "R2", "MAPE"]
+                    notes = [
+                        "Check residuals — should be random around zero",
+                        "R2 tells you the proportion of variance explained",
+                    ]
+                return dict(
+                    models=models,
+                    loss=loss,
+                    primary_metric=primary,
+                    secondary_metrics=secondary,
+                    imbalance_strategy=None,
+                    notes=notes,
+                )
+
+    # ── Question flow ─────────────────────────────────────────────────────────
+    st.markdown("---")
+    problem_type = _advisor_q(
+        "problem_type",
+        "1. Do you have labels (a target variable to predict)?",
+        ["Supervised — yes, I have labels", "Unsupervised — no labels"],
+    )
+
+    all_answered = False
+
+    if "Unsupervised" in problem_type:
+        goal = _advisor_q(
+            "goal",
+            "2. What's the goal?",
+            ["Group data into clusters", "Reduce dimensions", "Detect anomalies / outliers"],
+        )
+        if "cluster" in goal.lower():
+            _advisor_q(
+                "cluster_shape",
+                "3. What do you expect the clusters to look like?",
+                [
+                    "Round, similar-size clusters (known k)",
+                    "Arbitrary shapes / unknown structure",
+                    "Hierarchical / nested structure",
+                ],
+            )
+            all_answered = True
+        elif "dimension" in goal.lower():
+            _advisor_q(
+                "dim_relationship",
+                "3. Are the relationships in your data linear?",
+                ["Linear (PCA is fine)", "Non-linear / manifold structure"],
+            )
+            all_answered = True
+        else:
+            all_answered = True
+    else:
+        output_type = _advisor_q(
+            "output_type",
+            "2. What are you predicting?",
+            ["Category / class label", "Numeric value"],
+        )
+        if "Category" in output_type or "class" in output_type.lower():
+            _advisor_q(
+                "n_classes",
+                "3. How many classes?",
+                ["Binary (2 classes)", "Multi-class (3+ classes)"],
+            )
+            _advisor_q(
+                "imbalanced",
+                "4. Is the dataset imbalanced (minority class < 20%)?",
+                ["Yes — significant imbalance", "No — roughly balanced"],
+            )
+            _advisor_q(
+                "need_probs",
+                "5. Do you need calibrated probabilities (not just labels)?",
+                ["Yes — for ranking, EV formulas, decision systems", "No — just predictions"],
+                help_text="Calibration: P(churn)=0.7 should mean 70% of those cases actually churn.",
+            )
+            _advisor_q(
+                "interpretability",
+                "6. How important is interpretability to stakeholders?",
+                ["High — coefficients or rules must be explainable", "Low — optimise for performance"],
+            )
+            _advisor_q(
+                "dataset_size",
+                "7. Dataset size?",
+                ["Small (< 10K rows)", "Large (>= 10K rows)"],
+            )
+            all_answered = True
+        else:
+            _advisor_q(
+                "target_dist",
+                "3. What does the target distribution look like?",
+                [
+                    "Normal / symmetric",
+                    "Skewed (revenue, counts, time-to-event)",
+                    "Heavy outliers dominate",
+                ],
+            )
+            _advisor_q(
+                "reg_relationship",
+                "4. Feature-target relationship?",
+                ["Linear (or close to it)", "Non-linear / complex interactions"],
+            )
+            _advisor_q(
+                "reg_interpretability",
+                "5. Interpretability requirement?",
+                ["High — coefficients must be readable", "Low — performance matters more"],
+            )
+            all_answered = True
+
+    # ── Recommendation ────────────────────────────────────────────────────────
+    if all_answered:
+        st.markdown("---")
+        rec = _advisor_recommend(ans)
+
+        st.markdown(
+            '<div style="font-family:Space Grotesk,sans-serif;font-size:1.1rem;font-weight:700;'
+            'color:#c4b5fd;margin-bottom:1rem;text-transform:uppercase;letter-spacing:0.05em">'
+            "✦ Recommendation</div>",
+            unsafe_allow_html=True,
+        )
+
+        st.markdown("**Recommended models**")
+        for name, reason in rec["models"]:
+            st.markdown(
+                f'<div class="datrix-card" style="margin-bottom:0.5rem;padding:0.75rem 1rem">'
+                f'<span style="color:#e2e8f0;font-weight:600">{name}</span>'
+                f'<span style="color:#94a3b8;font-size:0.85rem"> — {reason}</span></div>',
+                unsafe_allow_html=True,
+            )
+
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.markdown(
+                f'<div class="datrix-card"><div style="font-size:0.72rem;color:#64748b;'
+                f'text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.3rem">Loss function</div>'
+                f'<div style="color:#22d3ee;font-weight:600">{rec["loss"]}</div></div>',
+                unsafe_allow_html=True,
+            )
+        with col_b:
+            st.markdown(
+                f'<div class="datrix-card"><div style="font-size:0.72rem;color:#64748b;'
+                f'text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.3rem">Primary metric</div>'
+                f'<div style="color:#22d3ee;font-weight:600">{rec["primary_metric"]}</div></div>',
+                unsafe_allow_html=True,
+            )
+
+        st.markdown(
+            '<div class="datrix-card"><div style="font-size:0.72rem;color:#64748b;'
+            'text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.4rem">Secondary metrics</div>'
+            + "".join(
+                f'<span style="display:inline-block;background:rgba(124,58,237,0.15);'
+                f'border:1px solid rgba(124,58,237,0.3);color:#c4b5fd;border-radius:6px;'
+                f'padding:2px 10px;font-size:0.82rem;margin:2px 4px 2px 0">{m}</span>'
+                for m in rec["secondary_metrics"]
+            )
+            + "</div>",
+            unsafe_allow_html=True,
+        )
+
+        if rec.get("imbalance_strategy"):
+            st.warning(f"**Imbalance:** {rec['imbalance_strategy']}")
+
+        if rec.get("notes"):
+            st.markdown("**Notes**")
+            for note in rec["notes"]:
+                st.markdown(f"- {note}")
+
+    st.markdown("---")
+    if st.button("Start over", type="secondary"):
+        st.session_state.advisor_answers = {}
+        for k in list(st.session_state.keys()):
+            if k.startswith("advisor_"):
+                del st.session_state[k]
+        st.rerun()
+    if st.button("Back to home", type="secondary"):
+        go_to("upload")
