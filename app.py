@@ -613,12 +613,14 @@ if st.session_state.stage == "upload":
                     unsafe_allow_html=True,
                 )
                 uploaded = None
-                st.button(
+                if st.button(
                     "🧭 Launch Advisor →",
                     type="primary",
                     use_container_width=True,
-                    key="start_advisor_btn",
-                )
+                ):
+                    st.session_state.mode = "model_advisor"
+                    st.session_state.advisor_answers = {}
+                    go_to("model_advisor")
             else:
                 uploaded = st.file_uploader(
                     "Drop your dataset here",
@@ -664,13 +666,6 @@ if st.session_state.stage == "upload":
 
         # Comparison table
         st.markdown(COMPARISON_HTML, unsafe_allow_html=True)
-
-        if selected_mode == "model_advisor" and st.session_state.get(
-            "start_advisor_btn"
-        ):
-            st.session_state.mode = "model_advisor"
-            st.session_state.advisor_answers = {}
-            go_to("model_advisor")
 
         if uploaded and st.session_state.get("start_btn"):
             with st.spinner("Loading file..."):
@@ -1758,31 +1753,52 @@ elif st.session_state.stage == "model_advisor":
                 if "Round" in shape:
                     return dict(
                         models=[
-                            ("K-Means", "Round, similar-size clusters — fast and scalable"),
-                            ("Gaussian Mixture Model", "Soft assignments, handles elliptical shapes"),
+                            (
+                                "K-Means",
+                                "Round, similar-size clusters — fast and scalable",
+                            ),
+                            (
+                                "Gaussian Mixture Model",
+                                "Soft assignments, handles elliptical shapes",
+                            ),
                         ],
                         loss="Inertia (within-cluster SSE)",
                         primary_metric="Silhouette score",
-                        secondary_metrics=["Elbow plot (inertia vs k)", "Davies-Bouldin index"],
+                        secondary_metrics=[
+                            "Elbow plot (inertia vs k)",
+                            "Davies-Bouldin index",
+                        ],
                         imbalance_strategy=None,
-                        notes=["Use the elbow method to pick k", "Scale features before clustering"],
+                        notes=[
+                            "Use the elbow method to pick k",
+                            "Scale features before clustering",
+                        ],
                     )
                 elif "Arbitrary" in shape:
                     return dict(
                         models=[
                             ("DBSCAN", "Arbitrary shapes + treats outliers as noise"),
-                            ("HDBSCAN", "Hierarchical version — robust to varying densities"),
+                            (
+                                "HDBSCAN",
+                                "Hierarchical version — robust to varying densities",
+                            ),
                         ],
                         loss="None (density-based)",
                         primary_metric="Silhouette score",
                         secondary_metrics=["Noise point %", "Number of clusters found"],
                         imbalance_strategy=None,
-                        notes=["Tune eps and min_samples carefully", "Scale features first"],
+                        notes=[
+                            "Tune eps and min_samples carefully",
+                            "Scale features first",
+                        ],
                     )
                 else:
                     return dict(
                         models=[
-                            ("Agglomerative Clustering", "Produces a dendrogram — cut at desired depth"),
+                            (
+                                "Agglomerative Clustering",
+                                "Produces a dendrogram — cut at desired depth",
+                            ),
                             ("K-Means", "Flat alternative if hierarchy not needed"),
                         ],
                         loss="Linkage distance",
@@ -1795,37 +1811,62 @@ elif st.session_state.stage == "model_advisor":
                 rel = a.get("dim_relationship", "")
                 if "Linear" in rel:
                     return dict(
-                        models=[("PCA", "Fast, interpretable — explained variance tells you how many components to keep")],
+                        models=[
+                            (
+                                "PCA",
+                                "Fast, interpretable — explained variance tells you how many components to keep",
+                            )
+                        ],
                         loss="Reconstruction error",
                         primary_metric="Cumulative explained variance ratio",
                         secondary_metrics=["Scree plot"],
                         imbalance_strategy=None,
-                        notes=["Scale features before PCA", "Keep components that explain >= 90-95% variance"],
+                        notes=[
+                            "Scale features before PCA",
+                            "Keep components that explain >= 90-95% variance",
+                        ],
                     )
                 else:
                     return dict(
                         models=[
-                            ("UMAP", "Preserves global structure — use for downstream ML tasks"),
-                            ("t-SNE", "Better 2D visualization — don't use for downstream tasks"),
+                            (
+                                "UMAP",
+                                "Preserves global structure — use for downstream ML tasks",
+                            ),
+                            (
+                                "t-SNE",
+                                "Better 2D visualization — don't use for downstream tasks",
+                            ),
                         ],
                         loss="KL divergence (t-SNE) / cross-entropy (UMAP)",
                         primary_metric="Visual cluster separation",
                         secondary_metrics=["Trustworthiness score"],
                         imbalance_strategy=None,
-                        notes=["UMAP is faster and more stable — prefer it for ML pipelines"],
+                        notes=[
+                            "UMAP is faster and more stable — prefer it for ML pipelines"
+                        ],
                     )
             else:
                 return dict(
                     models=[
-                        ("Isolation Forest", "Fast, scalable — isolates outliers via random splits"),
+                        (
+                            "Isolation Forest",
+                            "Fast, scalable — isolates outliers via random splits",
+                        ),
                         ("One-Class SVM", "Better for small, clean datasets"),
-                        ("Local Outlier Factor", "Good when anomalies cluster differently from normals"),
+                        (
+                            "Local Outlier Factor",
+                            "Good when anomalies cluster differently from normals",
+                        ),
                     ],
                     loss="Anomaly score (path length / distance)",
                     primary_metric="AUC-ROC (if labels exist) or Precision@k",
                     secondary_metrics=["Contamination parameter sensitivity"],
                     imbalance_strategy=None,
-                    notes=["Set contamination = expected anomaly rate", "Isolation Forest scales best to large data"],
+                    notes=[
+                        "Set contamination = expected anomaly rate",
+                        "Isolation Forest scales best to large data",
+                    ],
                 )
         else:
             output_type = a.get("output_type", "")
@@ -1843,19 +1884,37 @@ elif st.session_state.stage == "model_advisor":
                 models = []
                 if needs_interp:
                     models += [
-                        ("Logistic Regression", "Coefficients directly readable — most interpretable"),
-                        ("Decision Tree", "Visual rules — use max_depth to control overfitting"),
+                        (
+                            "Logistic Regression",
+                            "Coefficients directly readable — most interpretable",
+                        ),
+                        (
+                            "Decision Tree",
+                            "Visual rules — use max_depth to control overfitting",
+                        ),
                     ]
                 if is_small:
                     if not needs_interp:
                         models += [
-                            ("Logistic Regression", "Low overfitting risk on small datasets"),
-                            ("SVM (RBF kernel)", "Strong on small datasets with clear margins"),
+                            (
+                                "Logistic Regression",
+                                "Low overfitting risk on small datasets",
+                            ),
+                            (
+                                "SVM (RBF kernel)",
+                                "Strong on small datasets with clear margins",
+                            ),
                         ]
                 else:
                     models += [
-                        ("LightGBM", "Best default for tabular — fast, handles imbalance, minimal preprocessing"),
-                        ("Random Forest", "Robust baseline, reliable feature importance"),
+                        (
+                            "LightGBM",
+                            "Best default for tabular — fast, handles imbalance, minimal preprocessing",
+                        ),
+                        (
+                            "Random Forest",
+                            "Robust baseline, reliable feature importance",
+                        ),
                     ]
                     if not needs_interp:
                         models += [("XGBoost", "Strong competitor to LightGBM")]
@@ -1878,7 +1937,9 @@ elif st.session_state.stage == "model_advisor":
                     notes += ["Tune the decision threshold — don't default to 0.5"]
                 return dict(
                     models=models,
-                    loss="Binary cross-entropy" if is_binary else "Categorical cross-entropy",
+                    loss="Binary cross-entropy"
+                    if is_binary
+                    else "Categorical cross-entropy",
                     primary_metric=primary,
                     secondary_metrics=secondary,
                     imbalance_strategy=imb_strategy,
@@ -1895,22 +1956,37 @@ elif st.session_state.stage == "model_advisor":
                 models = []
                 if needs_interp and is_linear:
                     models += [
-                        ("Linear Regression", "Coefficients = direct effect — most interpretable"),
-                        ("Ridge / Lasso", "Regularized linear — Lasso does feature selection"),
+                        (
+                            "Linear Regression",
+                            "Coefficients = direct effect — most interpretable",
+                        ),
+                        (
+                            "Ridge / Lasso",
+                            "Regularized linear — Lasso does feature selection",
+                        ),
                     ]
                 elif needs_interp:
                     models += [
                         ("Ridge", "Linear baseline with regularization"),
-                        ("Random Forest", "Non-linear + interpretable via feature importance"),
+                        (
+                            "Random Forest",
+                            "Non-linear + interpretable via feature importance",
+                        ),
                     ]
                 elif is_linear:
                     models += [
                         ("Ridge", "Regularized linear"),
-                        ("LightGBM", "Often beats linear models — captures interactions"),
+                        (
+                            "LightGBM",
+                            "Often beats linear models — captures interactions",
+                        ),
                     ]
                 else:
                     models += [
-                        ("LightGBM", "Best default — handles interactions, skew, missing values natively"),
+                        (
+                            "LightGBM",
+                            "Best default — handles interactions, skew, missing values natively",
+                        ),
                         ("XGBoost", "Strong alternative"),
                         ("Random Forest", "Robust baseline"),
                     ]
@@ -1926,7 +2002,11 @@ elif st.session_state.stage == "model_advisor":
                         "Inverse-transform predictions after training",
                     ]
                 elif has_outliers:
-                    loss, primary, secondary = "MAE or Huber loss", "MAE", ["RMSE", "R2"]
+                    loss, primary, secondary = (
+                        "MAE or Huber loss",
+                        "MAE",
+                        ["RMSE", "R2"],
+                    )
                     notes = [
                         "MSE amplifies outlier errors — prefer MAE or Huber",
                         "Consider clipping extreme values or quantile regression",
@@ -1960,7 +2040,11 @@ elif st.session_state.stage == "model_advisor":
         goal = _advisor_q(
             "goal",
             "2. What's the goal?",
-            ["Group data into clusters", "Reduce dimensions", "Detect anomalies / outliers"],
+            [
+                "Group data into clusters",
+                "Reduce dimensions",
+                "Detect anomalies / outliers",
+            ],
         )
         if "cluster" in goal.lower():
             _advisor_q(
@@ -2002,13 +2086,19 @@ elif st.session_state.stage == "model_advisor":
             _advisor_q(
                 "need_probs",
                 "5. Do you need calibrated probabilities (not just labels)?",
-                ["Yes — for ranking, EV formulas, decision systems", "No — just predictions"],
+                [
+                    "Yes — for ranking, EV formulas, decision systems",
+                    "No — just predictions",
+                ],
                 help_text="Calibration: P(churn)=0.7 should mean 70% of those cases actually churn.",
             )
             _advisor_q(
                 "interpretability",
                 "6. How important is interpretability to stakeholders?",
-                ["High — coefficients or rules must be explainable", "Low — optimise for performance"],
+                [
+                    "High — coefficients or rules must be explainable",
+                    "Low — optimise for performance",
+                ],
             )
             _advisor_q(
                 "dataset_size",
@@ -2034,7 +2124,10 @@ elif st.session_state.stage == "model_advisor":
             _advisor_q(
                 "reg_interpretability",
                 "5. Interpretability requirement?",
-                ["High — coefficients must be readable", "Low — performance matters more"],
+                [
+                    "High — coefficients must be readable",
+                    "Low — performance matters more",
+                ],
             )
             all_answered = True
 
@@ -2080,7 +2173,7 @@ elif st.session_state.stage == "model_advisor":
             'text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.4rem">Secondary metrics</div>'
             + "".join(
                 f'<span style="display:inline-block;background:rgba(124,58,237,0.15);'
-                f'border:1px solid rgba(124,58,237,0.3);color:#c4b5fd;border-radius:6px;'
+                f"border:1px solid rgba(124,58,237,0.3);color:#c4b5fd;border-radius:6px;"
                 f'padding:2px 10px;font-size:0.82rem;margin:2px 4px 2px 0">{m}</span>'
                 for m in rec["secondary_metrics"]
             )
