@@ -351,6 +351,7 @@ with st.sidebar:
         "report": "07",
     }
     current = st.session_state.stage
+    current_idx = stages.index(current) if current in stages else -1
     for s in stages:
         if s not in st.session_state.workflow and s != "upload":
             continue
@@ -361,7 +362,7 @@ with st.sidebar:
                 f'<div class="nav-item-active">→ {num} · {label}</div>',
                 unsafe_allow_html=True,
             )
-        elif stages.index(s) < stages.index(current):
+        elif stages.index(s) < current_idx:
             st.markdown(
                 f'<div class="nav-item-done">✓ {num} · {label}</div>',
                 unsafe_allow_html=True,
