@@ -1716,486 +1716,1138 @@ elif st.session_state.stage == "causal":
         st.rerun()
 
 
+
+
 # ════════════════════════════════════════════════════════════════════════════════
 # MODEL ADVISOR STAGE
 # ════════════════════════════════════════════════════════════════════════════════
 elif st.session_state.stage == "model_advisor":
     page_header(
         "Model Advisor",
-        "Find the right model for your problem",
-        "Answer each question — the recommendation updates as you go",
+        "Find the right approach for your problem",
+        "One question at a time — get a tailored model, metric, and pitfall guide",
     )
 
-    if "advisor_answers" not in st.session_state:
-        st.session_state.advisor_answers = {}
-    ans = st.session_state.advisor_answers
-
-    def _advisor_q(key, label, options, help_text=None):
-        st.markdown(
-            f'<div style="font-weight:600;color:#e2e8f0;margin:1.2rem 0 0.3rem">{label}</div>',
-            unsafe_allow_html=True,
-        )
-        choice = st.radio(
-            label,
-            options,
-            key=f"advisor_{key}",
-            label_visibility="collapsed",
-            help=help_text,
-        )
-        ans[key] = choice
-        return choice
-
-    def _advisor_recommend(a):
-        pt = a.get("problem_type", "")
-        if "Unsupervised" in pt:
-            goal = a.get("goal", "")
-            if "cluster" in goal.lower():
-                shape = a.get("cluster_shape", "")
-                if "Round" in shape:
-                    return dict(
-                        models=[
-                            (
-                                "K-Means",
-                                "Round, similar-size clusters — fast and scalable",
-                            ),
-                            (
-                                "Gaussian Mixture Model",
-                                "Soft assignments, handles elliptical shapes",
-                            ),
-                        ],
-                        loss="Inertia (within-cluster SSE)",
-                        primary_metric="Silhouette score",
-                        secondary_metrics=[
-                            "Elbow plot (inertia vs k)",
-                            "Davies-Bouldin index",
-                        ],
-                        imbalance_strategy=None,
-                        notes=[
-                            "Use the elbow method to pick k",
-                            "Scale features before clustering",
-                        ],
-                    )
-                elif "Arbitrary" in shape:
-                    return dict(
-                        models=[
-                            ("DBSCAN", "Arbitrary shapes + treats outliers as noise"),
-                            (
-                                "HDBSCAN",
-                                "Hierarchical version — robust to varying densities",
-                            ),
-                        ],
-                        loss="None (density-based)",
-                        primary_metric="Silhouette score",
-                        secondary_metrics=["Noise point %", "Number of clusters found"],
-                        imbalance_strategy=None,
-                        notes=[
-                            "Tune eps and min_samples carefully",
-                            "Scale features first",
-                        ],
-                    )
-                else:
-                    return dict(
-                        models=[
-                            (
-                                "Agglomerative Clustering",
-                                "Produces a dendrogram — cut at desired depth",
-                            ),
-                            ("K-Means", "Flat alternative if hierarchy not needed"),
-                        ],
-                        loss="Linkage distance",
-                        primary_metric="Dendrogram cut point / Silhouette score",
-                        secondary_metrics=["Cophenetic correlation"],
-                        imbalance_strategy=None,
-                        notes=["Use Ward linkage for balanced clusters"],
-                    )
-            elif "dimension" in goal.lower():
-                rel = a.get("dim_relationship", "")
-                if "Linear" in rel:
-                    return dict(
-                        models=[
-                            (
-                                "PCA",
-                                "Fast, interpretable — explained variance tells you how many components to keep",
-                            )
-                        ],
-                        loss="Reconstruction error",
-                        primary_metric="Cumulative explained variance ratio",
-                        secondary_metrics=["Scree plot"],
-                        imbalance_strategy=None,
-                        notes=[
-                            "Scale features before PCA",
-                            "Keep components that explain >= 90-95% variance",
-                        ],
-                    )
-                else:
-                    return dict(
-                        models=[
-                            (
-                                "UMAP",
-                                "Preserves global structure — use for downstream ML tasks",
-                            ),
-                            (
-                                "t-SNE",
-                                "Better 2D visualization — don't use for downstream tasks",
-                            ),
-                        ],
-                        loss="KL divergence (t-SNE) / cross-entropy (UMAP)",
-                        primary_metric="Visual cluster separation",
-                        secondary_metrics=["Trustworthiness score"],
-                        imbalance_strategy=None,
-                        notes=[
-                            "UMAP is faster and more stable — prefer it for ML pipelines"
-                        ],
-                    )
-            else:
-                return dict(
-                    models=[
-                        (
-                            "Isolation Forest",
-                            "Fast, scalable — isolates outliers via random splits",
-                        ),
-                        ("One-Class SVM", "Better for small, clean datasets"),
-                        (
-                            "Local Outlier Factor",
-                            "Good when anomalies cluster differently from normals",
-                        ),
-                    ],
-                    loss="Anomaly score (path length / distance)",
-                    primary_metric="AUC-ROC (if labels exist) or Precision@k",
-                    secondary_metrics=["Contamination parameter sensitivity"],
-                    imbalance_strategy=None,
-                    notes=[
-                        "Set contamination = expected anomaly rate",
-                        "Isolation Forest scales best to large data",
-                    ],
-                )
-        else:
-            output_type = a.get("output_type", "")
-            if "Category" in output_type or "class" in output_type.lower():
-                n_cls = a.get("n_classes", "")
-                imb = a.get("imbalanced", "")
-                probs = a.get("need_probs", "")
-                interp = a.get("interpretability", "")
-                size = a.get("dataset_size", "")
-                is_binary = "Binary" in n_cls
-                is_imb = "Yes" in imb
-                needs_probs = "Yes" in probs
-                needs_interp = "High" in interp
-                is_small = "Small" in size
-                models = []
-                if needs_interp:
-                    models += [
-                        (
-                            "Logistic Regression",
-                            "Coefficients directly readable — most interpretable",
-                        ),
-                        (
-                            "Decision Tree",
-                            "Visual rules — use max_depth to control overfitting",
-                        ),
-                    ]
-                if is_small:
-                    if not needs_interp:
-                        models += [
-                            (
-                                "Logistic Regression",
-                                "Low overfitting risk on small datasets",
-                            ),
-                            (
-                                "SVM (RBF kernel)",
-                                "Strong on small datasets with clear margins",
-                            ),
-                        ]
-                else:
-                    models += [
-                        (
-                            "LightGBM",
-                            "Best default for tabular — fast, handles imbalance, minimal preprocessing",
-                        ),
-                        (
-                            "Random Forest",
-                            "Robust baseline, reliable feature importance",
-                        ),
-                    ]
-                    if not needs_interp:
-                        models += [("XGBoost", "Strong competitor to LightGBM")]
-                if is_imb:
-                    primary = "AUC-PR" if is_binary else "Macro F1"
-                    secondary = ["AUC-ROC", "F1 per class", "Precision@k"]
-                    imb_strategy = "Use class_weight='balanced'. Avoid accuracy — misleading with imbalance."
-                else:
-                    primary = "AUC-ROC" if is_binary else "Macro F1"
-                    secondary = ["AUC-PR", "F1", "Log loss"]
-                    imb_strategy = None
-                notes = []
-                if needs_probs:
-                    notes += [
-                        "Calibrate with CalibratedClassifierCV(method='isotonic')",
-                        "LightGBM with class_weight='balanced' often miscalibrates — check calibration curve",
-                        "Use log loss as a secondary metric to track calibration",
-                    ]
-                else:
-                    notes += ["Tune the decision threshold — don't default to 0.5"]
-                return dict(
-                    models=models,
-                    loss="Binary cross-entropy"
-                    if is_binary
-                    else "Categorical cross-entropy",
-                    primary_metric=primary,
-                    secondary_metrics=secondary,
-                    imbalance_strategy=imb_strategy,
-                    notes=notes,
-                )
-            else:
-                dist = a.get("target_dist", "")
-                rel = a.get("reg_relationship", "")
-                interp = a.get("reg_interpretability", "")
-                is_skewed = "Skewed" in dist
-                has_outliers = "outlier" in dist.lower()
-                is_linear = "Linear" in rel
-                needs_interp = "High" in interp
-                models = []
-                if needs_interp and is_linear:
-                    models += [
-                        (
-                            "Linear Regression",
-                            "Coefficients = direct effect — most interpretable",
-                        ),
-                        (
-                            "Ridge / Lasso",
-                            "Regularized linear — Lasso does feature selection",
-                        ),
-                    ]
-                elif needs_interp:
-                    models += [
-                        ("Ridge", "Linear baseline with regularization"),
-                        (
-                            "Random Forest",
-                            "Non-linear + interpretable via feature importance",
-                        ),
-                    ]
-                elif is_linear:
-                    models += [
-                        ("Ridge", "Regularized linear"),
-                        (
-                            "LightGBM",
-                            "Often beats linear models — captures interactions",
-                        ),
-                    ]
-                else:
-                    models += [
-                        (
-                            "LightGBM",
-                            "Best default — handles interactions, skew, missing values natively",
-                        ),
-                        ("XGBoost", "Strong alternative"),
-                        ("Random Forest", "Robust baseline"),
-                    ]
-                if is_skewed:
-                    loss, primary, secondary = (
-                        "MSE on log(y+1) — equivalent to RMSLE",
-                        "RMSLE",
-                        ["MAE", "RMSE on original scale"],
-                    )
-                    notes = [
-                        "Log-transform the target before modeling",
-                        "RMSLE penalises under-prediction more than over-prediction",
-                        "Inverse-transform predictions after training",
-                    ]
-                elif has_outliers:
-                    loss, primary, secondary = (
-                        "MAE or Huber loss",
-                        "MAE",
-                        ["RMSE", "R2"],
-                    )
-                    notes = [
-                        "MSE amplifies outlier errors — prefer MAE or Huber",
-                        "Consider clipping extreme values or quantile regression",
-                    ]
-                else:
-                    loss, primary, secondary = "MSE", "RMSE", ["MAE", "R2", "MAPE"]
-                    notes = [
-                        "Check residuals — should be random around zero",
-                        "R2 tells you the proportion of variance explained",
-                    ]
-                return dict(
-                    models=models,
-                    loss=loss,
-                    primary_metric=primary,
-                    secondary_metrics=secondary,
-                    imbalance_strategy=None,
-                    notes=notes,
-                )
-
-    # ── Question flow ─────────────────────────────────────────────────────────
-    st.markdown("---")
-    problem_type = _advisor_q(
-        "problem_type",
-        "1. Do you have labels (a target variable to predict)?",
-        ["Supervised — yes, I have labels", "Unsupervised — no labels"],
-    )
-
-    all_answered = False
-
-    if "Unsupervised" in problem_type:
-        goal = _advisor_q(
-            "goal",
-            "2. What's the goal?",
-            [
-                "Group data into clusters",
-                "Reduce dimensions",
-                "Detect anomalies / outliers",
+    # ── Decision tree ─────────────────────────────────────────────────────────
+    TREE = {
+        "problem_type": {
+            "q": "What type of machine learning problem are you solving?",
+            "help": "If you have labeled training examples, choose Supervised. If you want to find structure in raw data, choose Unsupervised.",
+            "options": [
+                "Supervised — I have labeled training data",
+                "Unsupervised — no labels, discover structure",
+                "Anomaly / outlier detection",
+                "Time series — data ordered in time",
+                "NLP / text data",
+                "Computer vision / images",
+                "Causal inference — estimate the effect of an intervention",
+                "A/B testing — compare two or more variants",
             ],
-        )
-        if "cluster" in goal.lower():
-            _advisor_q(
-                "cluster_shape",
-                "3. What do you expect the clusters to look like?",
-                [
-                    "Round, similar-size clusters (known k)",
-                    "Arbitrary shapes / unknown structure",
-                    "Hierarchical / nested structure",
-                ],
-            )
-            all_answered = True
-        elif "dimension" in goal.lower():
-            _advisor_q(
-                "dim_relationship",
-                "3. Are the relationships in your data linear?",
-                ["Linear (PCA is fine)", "Non-linear / manifold structure"],
-            )
-            all_answered = True
-        else:
-            all_answered = True
-    else:
-        output_type = _advisor_q(
-            "output_type",
-            "2. What are you predicting?",
-            ["Category / class label", "Numeric value"],
-        )
-        if "Category" in output_type or "class" in output_type.lower():
-            _advisor_q(
-                "n_classes",
-                "3. How many classes?",
-                ["Binary (2 classes)", "Multi-class (3+ classes)"],
-            )
-            _advisor_q(
-                "imbalanced",
-                "4. Is the dataset imbalanced (minority class < 20%)?",
-                ["Yes — significant imbalance", "No — roughly balanced"],
-            )
-            _advisor_q(
-                "need_probs",
-                "5. Do you need calibrated probabilities (not just labels)?",
-                [
-                    "Yes — for ranking, EV formulas, decision systems",
-                    "No — just predictions",
-                ],
-                help_text="Calibration: P(churn)=0.7 should mean 70% of those cases actually churn.",
-            )
-            _advisor_q(
-                "interpretability",
-                "6. How important is interpretability to stakeholders?",
-                [
-                    "High — coefficients or rules must be explainable",
-                    "Low — optimise for performance",
-                ],
-            )
-            _advisor_q(
-                "dataset_size",
-                "7. Dataset size?",
-                ["Small (< 10K rows)", "Large (>= 10K rows)"],
-            )
-            all_answered = True
-        else:
-            _advisor_q(
-                "target_dist",
-                "3. What does the target distribution look like?",
-                [
-                    "Normal / symmetric",
-                    "Skewed (revenue, counts, time-to-event)",
-                    "Heavy outliers dominate",
-                ],
-            )
-            _advisor_q(
-                "reg_relationship",
-                "4. Feature-target relationship?",
-                ["Linear (or close to it)", "Non-linear / complex interactions"],
-            )
-            _advisor_q(
-                "reg_interpretability",
-                "5. Interpretability requirement?",
-                [
-                    "High — coefficients must be readable",
-                    "Low — performance matters more",
-                ],
-            )
-            all_answered = True
+            "next": {
+                "supervised": "sup_output",
+                "unsupervised": "unsup_goal",
+                "anomaly": "anomaly_labels",
+                "time series": "ts_task",
+                "nlp": "nlp_task",
+                "computer vision": "vision_task",
+                "causal inference": "causal_goal",
+                "a/b testing": "ab_metric_type",
+            },
+        },
+        # ── Supervised ────────────────────────────────────────────────────────
+        "sup_output": {
+            "q": "What does your model need to output?",
+            "help": "This determines the loss function and evaluation metric family.",
+            "options": [
+                "A category or class label (classification)",
+                "A numeric value (regression)",
+                "A ranked list of items (ranking / recommendation)",
+            ],
+            "next": {
+                "category": "clf_modality",
+                "numeric": "reg_modality",
+                "ranked": "ranking_type",
+            },
+        },
+        # ── Classification ────────────────────────────────────────────────────
+        "clf_modality": {
+            "q": "What does your input data look like?",
+            "help": "Data modality determines the model architecture family.",
+            "options": [
+                "Tabular — rows and columns (CSV, database tables)",
+                "Text / language",
+                "Images or video",
+                "Time series / sequential measurements",
+            ],
+            "next": {
+                "tabular": "clf_tab_classes",
+                "text": "nlp_task",
+                "images": "vision_task",
+                "time series": "ts_task",
+            },
+        },
+        "clf_tab_classes": {
+            "q": "How many output classes are there?",
+            "help": "Multi-label means a single sample can belong to multiple classes at once (e.g. a movie tagged as both Action and Comedy).",
+            "options": [
+                "Binary — exactly 2 classes (yes/no, churn/stay, fraud/legit)",
+                "Multi-class — 3 or more mutually exclusive classes",
+                "Multi-label — each sample can have multiple simultaneous labels",
+            ],
+            "next": {
+                "binary": "clf_tab_imbalance",
+                "multi-class": "clf_tab_imbalance",
+                "multi-label": "clf_tab_interp",
+            },
+        },
+        "clf_tab_imbalance": {
+            "q": "How balanced are the classes in your dataset?",
+            "help": "Severe imbalance (e.g. 1% fraud cases in 99% legitimate) changes which metrics and training strategies are appropriate.",
+            "options": [
+                "Balanced — classes are roughly equal",
+                "Mild imbalance — minority class is 10–30% of data",
+                "Severe imbalance — minority class is under 10%",
+            ],
+            "next": {
+                "balanced": "clf_tab_interp",
+                "mild": "clf_tab_interp",
+                "severe": "clf_tab_interp",
+            },
+        },
+        "clf_tab_interp": {
+            "q": "How important is interpretability?",
+            "help": "Regulated industries (finance, healthcare, hiring) often legally require explainable decisions.",
+            "options": [
+                "High — regulators or executives need to understand every prediction",
+                "Medium — SHAP plots and feature importance are sufficient",
+                "Low — only performance matters",
+            ],
+            "next": {
+                "high": "clf_tab_probs",
+                "medium": "clf_tab_probs",
+                "low": "clf_tab_probs",
+            },
+        },
+        "clf_tab_probs": {
+            "q": "Do you need calibrated probability scores or just class labels?",
+            "help": "Calibrated: P(churn)=0.7 means 70% of flagged players actually churn. Required when probabilities feed into scoring systems, EV formulas, or risk tiers.",
+            "options": [
+                "Yes — probabilities feed into a ranking, formula, or risk system",
+                "No — I only need the predicted class",
+            ],
+            "next": {
+                "yes": "rec_clf_tabular",
+                "no": "rec_clf_tabular",
+            },
+        },
+        # ── Regression ────────────────────────────────────────────────────────
+        "reg_modality": {
+            "q": "What does your input data look like?",
+            "options": [
+                "Tabular — structured rows and columns",
+                "Time series — predict future values of a sequence",
+                "Text — produce a numeric score from text",
+                "Images — predict a measurement from an image",
+            ],
+            "next": {
+                "tabular": "reg_tab_dist",
+                "time series": "ts_task",
+                "text": "nlp_task",
+                "images": "vision_task",
+            },
+        },
+        "reg_tab_dist": {
+            "q": "What does your target variable distribution look like?",
+            "help": "Skewed targets need log-transformation or RMSLE. Outlier-heavy distributions need robust losses. Bounded targets may need a sigmoid output.",
+            "options": [
+                "Normal / symmetric — roughly bell-curve shaped",
+                "Right-skewed — long tail (revenue, counts, durations)",
+                "Heavy outliers — extreme values dominate the variance",
+                "Bounded — values in a fixed range (e.g. 0–1 ratings, percentages)",
+            ],
+            "next": {
+                "normal": "reg_tab_rel",
+                "right-skewed": "reg_tab_rel",
+                "heavy outliers": "reg_tab_rel",
+                "bounded": "reg_tab_rel",
+            },
+        },
+        "reg_tab_rel": {
+            "q": "How complex is the relationship between features and target?",
+            "help": "Look at scatter plots and correlation coefficients. If they're near-linear, start simple. Non-linearity and interactions between features often benefit from tree models.",
+            "options": [
+                "Mostly linear — linear models perform close to tree models",
+                "Non-linear with interactions — features combine in complex, non-obvious ways",
+                "Unknown — I have not explored this yet",
+            ],
+            "next": {
+                "mostly linear": "reg_tab_interp",
+                "non-linear": "reg_tab_interp",
+                "unknown": "reg_tab_interp",
+            },
+        },
+        "reg_tab_interp": {
+            "q": "How important is interpretability for this regression task?",
+            "options": [
+                "High — I need to explain individual predictions or regression coefficients",
+                "Low — minimising prediction error is the only priority",
+            ],
+            "next": {
+                "high": "rec_reg_tabular",
+                "low": "rec_reg_tabular",
+            },
+        },
+        # ── Ranking ───────────────────────────────────────────────────────────
+        "ranking_type": {
+            "q": "What kind of ranking or recommendation system are you building?",
+            "options": [
+                "Collaborative filtering — based on user–item interaction history",
+                "Content-based — items have features, match users to item attributes",
+                "Hybrid — both interaction history and item features available",
+                "Learning-to-rank — explicit relevance labels (e.g. search, ads)",
+            ],
+            "next": {
+                "collaborative": "rec_collab",
+                "content-based": "rec_content",
+                "hybrid": "rec_hybrid",
+                "learning-to-rank": "rec_ltr",
+            },
+        },
+        # ── Time series ───────────────────────────────────────────────────────
+        "ts_task": {
+            "q": "What is the time series task?",
+            "options": [
+                "Forecasting — predict future values",
+                "Classification — assign a label to a sequence",
+                "Anomaly detection — find unusual patterns over time",
+            ],
+            "next": {
+                "forecasting": "ts_horizon",
+                "classification": "rec_ts_clf",
+                "anomaly": "rec_ts_anomaly",
+            },
+        },
+        "ts_horizon": {
+            "q": "What is your forecast horizon?",
+            "help": "Short-horizon forecasting (next 1–7 steps) and long-horizon (90+ steps) require different approaches. Models that excel at one often underperform on the other.",
+            "options": [
+                "Short — next 1 to 7 time steps",
+                "Medium — next 7 to 90 steps",
+                "Long — more than 90 steps ahead",
+            ],
+            "next": {
+                "short": "ts_series_count",
+                "medium": "ts_series_count",
+                "long": "ts_series_count",
+            },
+        },
+        "ts_series_count": {
+            "q": "How many time series are you working with?",
+            "help": "Global models (trained across many series) often outperform local models (one per series) when series are related. But they need enough data per series.",
+            "options": [
+                "One — a single time series",
+                "A few — 2 to ~50 related series",
+                "Many — hundreds or thousands of related series",
+            ],
+            "next": {
+                "one": "rec_ts_forecast",
+                "few": "rec_ts_forecast",
+                "many": "rec_ts_forecast",
+            },
+        },
+        # ── NLP ───────────────────────────────────────────────────────────────
+        "nlp_task": {
+            "q": "What is the NLP task?",
+            "options": [
+                "Text classification — assign a label (sentiment, topic, intent, spam)",
+                "Text generation — produce text (summarisation, QA, translation, chat)",
+                "Information extraction — pull out entities, relations, or structured data",
+                "Embeddings / semantic similarity — represent text as vectors for search or clustering",
+            ],
+            "next": {
+                "classification": "nlp_size",
+                "generation": "rec_nlp_gen",
+                "extraction": "rec_nlp_extraction",
+                "embeddings": "rec_nlp_emb",
+            },
+        },
+        "nlp_size": {
+            "q": "How large is your labelled text dataset?",
+            "help": "With fewer than 1,000 examples, fine-tuning a pretrained transformer beats training from scratch by a huge margin.",
+            "options": [
+                "Small — fewer than 1,000 labelled examples",
+                "Medium — 1,000 to 50,000 labelled examples",
+                "Large — more than 50,000 labelled examples",
+            ],
+            "next": {
+                "small": "rec_nlp_clf",
+                "medium": "rec_nlp_clf",
+                "large": "rec_nlp_clf",
+            },
+        },
+        # ── Vision ────────────────────────────────────────────────────────────
+        "vision_task": {
+            "q": "What is the computer vision task?",
+            "options": [
+                "Image classification — assign a single label to the whole image",
+                "Object detection — locate and classify multiple objects in one image",
+                "Segmentation — label every pixel (semantic or instance)",
+                "Embeddings / similarity — represent images as vectors for search or clustering",
+            ],
+            "next": {
+                "classification": "rec_vision_clf",
+                "detection": "rec_vision_det",
+                "segmentation": "rec_vision_seg",
+                "embeddings": "rec_vision_emb",
+            },
+        },
+        # ── Unsupervised ──────────────────────────────────────────────────────
+        "unsup_goal": {
+            "q": "What is the goal of the unsupervised analysis?",
+            "options": [
+                "Clustering — discover natural groups in the data",
+                "Dimensionality reduction — compress or visualise high-dimensional data",
+                "Generative modelling — learn to generate new synthetic samples",
+            ],
+            "next": {
+                "clustering": "clustering_k",
+                "dimensionality": "dimred_purpose",
+                "generative": "rec_generative",
+            },
+        },
+        "clustering_k": {
+            "q": "Do you know how many clusters to expect?",
+            "help": "If you have domain knowledge (e.g. 4 customer segments), use it. If not, the algorithm can determine the number automatically.",
+            "options": [
+                "Yes — I have a good estimate of k",
+                "No — I want the data to decide",
+            ],
+            "next": {
+                "yes": "clustering_shape",
+                "no": "clustering_shape",
+            },
+        },
+        "clustering_shape": {
+            "q": "What shape do you expect the clusters to have?",
+            "help": "K-Means only finds round, equally-sized clusters. Real data is often more complex.",
+            "options": [
+                "Round and compact — spherical, roughly equal-size groups",
+                "Arbitrary shapes — elongated, ring-shaped, or irregular",
+                "Hierarchical — nested structure at different granularities",
+                "Very unequal sizes — a few large clusters and many tiny niche groups",
+            ],
+            "next": {
+                "round": "rec_clustering",
+                "arbitrary": "rec_clustering",
+                "hierarchical": "rec_clustering",
+                "unequal": "rec_clustering",
+            },
+        },
+        "dimred_purpose": {
+            "q": "What is the dimensionality reduction for?",
+            "options": [
+                "Visualisation — plot high-dimensional data in 2D or 3D",
+                "Feature compression — reduce input size before a downstream model",
+                "Noise removal — retain signal, discard noisy variance",
+            ],
+            "next": {
+                "visualisation": "dimred_linear",
+                "feature compression": "dimred_linear",
+                "noise": "dimred_linear",
+            },
+        },
+        "dimred_linear": {
+            "q": "Are the relationships in your data mostly linear?",
+            "help": "PCA finds linear directions of maximum variance. Non-linear methods (UMAP, t-SNE) can capture manifold structure — useful for images, text embeddings, or molecular data.",
+            "options": [
+                "Linear — data clusters along straight axes",
+                "Non-linear — data lives on a curved manifold",
+                "Unknown",
+            ],
+            "next": {
+                "linear": "rec_dimred",
+                "non-linear": "rec_dimred",
+                "unknown": "rec_dimred",
+            },
+        },
+        # ── Anomaly detection ─────────────────────────────────────────────────
+        "anomaly_labels": {
+            "q": "Do you have labeled anomaly examples?",
+            "help": "Even a small number of confirmed anomaly labels converts this from unsupervised (hard) to semi-supervised (much easier).",
+            "options": [
+                "No labels — fully unsupervised",
+                "A small number of confirmed anomalies — semi-supervised",
+                "Fully labeled dataset (both normal and anomalous) — treat as classification",
+            ],
+            "next": {
+                "no labels": "anomaly_data",
+                "small number": "anomaly_data",
+                "fully labeled": "clf_modality",
+            },
+        },
+        "anomaly_data": {
+            "q": "What type of data are you detecting anomalies in?",
+            "options": [
+                "Tabular — transactions, sensor readings, user events",
+                "Time series — detecting unusual patterns or changepoints over time",
+                "Text — unusual documents, log messages, or queries",
+                "Images — detecting defective or abnormal items",
+            ],
+            "next": {
+                "tabular": "rec_anomaly_tabular",
+                "time series": "rec_ts_anomaly",
+                "text": "rec_nlp_anomaly",
+                "images": "rec_vision_anomaly",
+            },
+        },
+        # ── Causal inference ──────────────────────────────────────────────────
+        "causal_goal": {
+            "q": "What is the causal inference goal?",
+            "help": "Causal inference estimates what would have happened under different conditions — something correlation alone cannot answer.",
+            "options": [
+                "Estimate the average effect of a treatment or intervention (ATE)",
+                "Find which variables causally affect the outcome (causal discovery)",
+                "Estimate individual-level treatment effects (uplift / heterogeneous effects)",
+                "Build a causal graph / DAG from observational data",
+            ],
+            "next": {
+                "average effect": "causal_data",
+                "which variables": "rec_causal_discovery",
+                "individual-level": "causal_data",
+                "causal graph": "rec_causal_discovery",
+            },
+        },
+        "causal_data": {
+            "q": "What data do you have?",
+            "options": [
+                "Randomised experiment (RCT) — treatment was assigned randomly",
+                "Observational data — treatment was not randomised, confounders exist",
+                "Observational data with a natural experiment or instrument",
+            ],
+            "next": {
+                "randomised": "rec_causal_rct",
+                "observational data —": "rec_causal_obs",
+                "natural experiment": "rec_causal_iv",
+            },
+        },
+        # ── A/B testing ───────────────────────────────────────────────────────
+        "ab_metric_type": {
+            "q": "What type of outcome are you measuring?",
+            "options": [
+                "Continuous — revenue, session duration, score",
+                "Binary / conversion — clicked, purchased, churned (yes/no)",
+                "Count or rate — sessions per user, events per day",
+                "Time-to-event — survival, time until purchase or churn",
+            ],
+            "next": {
+                "continuous": "ab_sample",
+                "binary": "ab_sample",
+                "count": "ab_sample",
+                "time-to-event": "rec_ab_survival",
+            },
+        },
+        "ab_sample": {
+            "q": "Do you have enough sample size or is this still being planned?",
+            "options": [
+                "Planning — I need to calculate required sample size before running",
+                "Already running or completed — I need to analyse the results",
+            ],
+            "next": {
+                "planning": "rec_ab_planning",
+                "already running": "rec_ab_analysis",
+            },
+        },
+    }
 
-    # ── Recommendation ────────────────────────────────────────────────────────
-    if all_answered:
-        st.markdown("---")
-        rec = _advisor_recommend(ans)
+    # ── Recommendations ────────────────────────────────────────────────────────
+    RECS = {
+        "rec_clf_tabular": {
+            "title": "Tabular Classification",
+            "models": [
+                ("LightGBM / XGBoost", "Best default for tabular data — fast, handles missing values, imbalance-aware via class_weight"),
+                ("Random Forest", "Robust, less sensitive to hyperparameters, reliable feature importance"),
+                ("Logistic Regression", "Use when interpretability is high — coefficients are directly readable"),
+                ("SVM (RBF kernel)", "Strong on small datasets with clear decision boundaries"),
+            ],
+            "loss": "Binary cross-entropy (binary) · Categorical cross-entropy (multi-class) · Binary CE per label (multi-label)",
+            "primary_metric": "AUC-ROC (balanced) · AUC-PR (imbalanced binary) · Macro F1 (multi-class)",
+            "secondary_metrics": ["F1 / Precision / Recall", "Log loss (calibration quality)", "Confusion matrix"],
+            "watch_out": [
+                "**Imbalance:** Accuracy is misleading when classes are imbalanced. Use AUC-PR or F1, and set class_weight='balanced'.",
+                "**Calibration:** LightGBM with class_weight='balanced' often produces miscalibrated probabilities. Always check the calibration curve and wrap with CalibratedClassifierCV(method='isotonic') if probabilities matter.",
+                "**Threshold:** The default 0.5 threshold is almost never optimal. Use the Precision-Recall curve to find the right operating point for your cost asymmetry.",
+                "**Data leakage:** Features derived from the target (or from post-event data) will inflate metrics dramatically. Validate feature timestamps carefully.",
+                "**Overfitting on small datasets:** With fewer than 5K rows, tree ensembles overfit. Use cross-validation, not a single train/val split.",
+            ],
+        },
+        "rec_reg_tabular": {
+            "title": "Tabular Regression",
+            "models": [
+                ("LightGBM / XGBoost", "Best default — handles non-linearity, interactions, and missing values natively"),
+                ("Ridge Regression", "Strong linear baseline with regularisation; use when interpretability is high"),
+                ("Lasso Regression", "Like Ridge but also performs feature selection — good when many features are irrelevant"),
+                ("Random Forest", "Robust non-linear baseline with reliable feature importance"),
+            ],
+            "loss": "MSE (symmetric target) · MAE / Huber (outlier-heavy) · RMSLE (skewed/log-scale)",
+            "primary_metric": "RMSE (normal target) · MAE (outliers) · RMSLE (skewed)",
+            "secondary_metrics": ["R² (proportion of variance explained)", "MAPE (percentage error, avoid when target near zero)", "Residual plots"],
+            "watch_out": [
+                "**Skewed targets:** Log-transform skewed targets before training. Predict log(y+1), then exponentiate predictions. Use RMSLE as the loss.",
+                "**Outliers in target:** MSE squares errors, so outliers dominate. Use Huber loss or MAE, or clip the most extreme values.",
+                "**Residual patterns:** Plot residuals vs predicted values. Any visible pattern (fan shape, curve) means model assumptions are violated.",
+                "**R² can be misleading:** A high R² doesn't mean the model is well-calibrated. Always inspect residual distributions.",
+                "**Feature scaling:** Tree models (LightGBM, RF) don't need scaling. Linear models (Ridge, Lasso) do — always scale for those.",
+            ],
+        },
+        "rec_collab": {
+            "title": "Collaborative Filtering",
+            "models": [
+                ("Matrix Factorisation (SVD / ALS)", "Classic baseline — decomposes user–item matrix into latent factors"),
+                ("Neural Collaborative Filtering", "Replaces dot product with MLP — captures non-linear interactions"),
+                ("Transformer-based (e.g. SASRec, BERT4Rec)", "Models the temporal order of interactions — best for sequential recommendation"),
+                ("LightFM", "Hybrid: adds item/user features to MF — handles cold start better"),
+            ],
+            "loss": "BPR (Bayesian Personalised Ranking) · BCE on positive/negative pairs · Cross-entropy (next-item prediction)",
+            "primary_metric": "NDCG@K · Hit@K · Recall@K",
+            "secondary_metrics": ["MRR (mean reciprocal rank)", "Coverage (% of catalogue recommended)", "Novelty / diversity"],
+            "watch_out": [
+                "**Cold start:** Pure CF cannot recommend to new users or new items with no interaction history. You need a content-based fallback or hybrid model.",
+                "**Popularity bias:** CF tends to recommend popular items repeatedly. Measure coverage and diversity alongside accuracy metrics.",
+                "**Implicit vs explicit feedback:** Ratings are sparse explicit signal. Clicks/views are implicit but noisy. Model them differently — implicit feedback needs negative sampling.",
+                "**Evaluation pitfall:** Random train/test split leaks future data into training. Always split by timestamp.",
+                "**Scalability:** Full matrix factorisation is O(users × items). Use approximate nearest-neighbour search (FAISS, ScaNN) at inference.",
+            ],
+        },
+        "rec_content": {
+            "title": "Content-Based Recommendation",
+            "models": [
+                ("Cosine similarity on TF-IDF / embeddings", "Fast baseline — represent items as vectors, return nearest neighbours"),
+                ("Two-tower neural model", "Separate encoders for user and item — scalable, good for large catalogues"),
+                ("Logistic Regression on user–item feature pairs", "Interpretable, works well with rich engineered features"),
+            ],
+            "loss": "BCE on positive/negative pairs · Contrastive loss (two-tower)",
+            "primary_metric": "NDCG@K · Recall@K",
+            "secondary_metrics": ["Coverage", "Diversity", "Serendipity"],
+            "watch_out": [
+                "**Feature quality is everything:** Content-based systems are only as good as the item features. Invest in rich, clean metadata.",
+                "**Filter bubble:** Users get items similar to what they already know — no serendipity. Mix in popularity or random exploration.",
+                "**Stale embeddings:** If items change frequently, re-embed regularly or use online updates.",
+            ],
+        },
+        "rec_hybrid": {
+            "title": "Hybrid Recommendation",
+            "models": [
+                ("LightFM", "MF + side features in one model — best starting point for hybrid"),
+                ("Two-tower model with interaction features", "Encode user history + item features separately, combine at scoring"),
+                ("Ensemble of CF + content scores", "Blend CF and content rankings with a learned or heuristic weight"),
+            ],
+            "loss": "BPR · BCE · Contrastive",
+            "primary_metric": "NDCG@K",
+            "secondary_metrics": ["Hit@K", "Coverage", "Cold-start Hit@K"],
+            "watch_out": [
+                "**Complexity creep:** Hybrids are harder to debug. Start with separate CF and content models, then blend.",
+                "**Cold start coverage:** Measure hit rate specifically for new users and new items — that's the main reason to go hybrid.",
+            ],
+        },
+        "rec_ltr": {
+            "title": "Learning to Rank",
+            "models": [
+                ("LightGBM with LambdaRank", "Best overall — gradient boosting tuned directly on NDCG"),
+                ("XGBoost rank:pairwise", "Pairwise ranking loss — optimises relative order of document pairs"),
+                ("Linear model (RankSVM)", "Fast interpretable baseline for low-latency serving"),
+            ],
+            "loss": "LambdaRank (listwise NDCG proxy) · Pairwise hinge · Pointwise cross-entropy",
+            "primary_metric": "NDCG@K · MAP@K",
+            "secondary_metrics": ["MRR", "Precision@K"],
+            "watch_out": [
+                "**Label quality:** LTR is only as good as the relevance labels. Noisy labels (click data) need careful treatment — clicks are biased by position.",
+                "**Position bias:** Users click top results more regardless of relevance. Use inverse propensity scoring or randomised logging to correct.",
+                "**Evaluation at the right K:** Choose K to match the actual UI (e.g. K=10 for a 10-result page). NDCG@100 is meaningless if users only see 5 results.",
+            ],
+        },
+        "rec_ts_forecast": {
+            "title": "Time Series Forecasting",
+            "models": [
+                ("LightGBM with lag + rolling features", "Best tabular approach — create lag features, rolling stats, then treat as regression"),
+                ("Prophet", "Good for business time series with trend + seasonality + holidays. Fast to deploy."),
+                ("N-BEATS / N-HiTS", "Pure neural, no feature engineering needed — strong on medium/long horizons"),
+                ("Temporal Fusion Transformer (TFT)", "Best for many related series with covariates — state of the art on M5"),
+                ("ARIMA / ETS", "Classical baselines — fast to fit, interpretable, use as benchmark"),
+            ],
+            "loss": "MAE · MSE · MASE (mean absolute scaled error, scale-independent)",
+            "primary_metric": "RMSE or MAE (short horizon) · MASE (comparable across series) · MAPE (avoid when target near zero)",
+            "secondary_metrics": ["Prediction interval coverage", "Bias (mean error)", "Quantile loss"],
+            "watch_out": [
+                "**Data leakage via the future:** Any feature computed using data after the forecast origin will leak. Be extremely careful with rolling aggregations — use expanding windows or properly lagged windows.",
+                "**Backtest with walk-forward validation:** Random splits are wrong for time series. Use rolling-origin evaluation.",
+                "**Seasonality and trend non-stationarity:** Many models assume stationarity. Test with ADF/KPSS, and difference or detrend if needed.",
+                "**Forecast horizon vs model:** ARIMA and LSTM struggle at long horizons. N-HiTS and TFT are designed for long-range.",
+                "**Prediction intervals matter:** Point forecasts alone are dangerous for planning. Report 80% and 95% prediction intervals.",
+                "**Many series:** Training one model per series is rarely optimal. Global models (LightGBM trained on all series, TFT) usually win when series are related.",
+            ],
+        },
+        "rec_ts_clf": {
+            "title": "Time Series Classification",
+            "models": [
+                ("ROCKET / MiniROCKET", "State-of-the-art accuracy, extremely fast — random convolutional kernels + Ridge classifier"),
+                ("LightGBM on statistical features", "Extract mean, std, autocorrelation, entropy per series — then standard tabular classification"),
+                ("1D-CNN", "Good when local pattern shape matters — beats LSTMs on many benchmarks"),
+                ("InceptionTime", "Ensemble of 1D-CNNs at multiple scales — strong default deep learning baseline"),
+            ],
+            "loss": "Cross-entropy",
+            "primary_metric": "Accuracy (balanced) · Macro F1 (imbalanced classes)",
+            "secondary_metrics": ["Per-class F1", "Confusion matrix"],
+            "watch_out": [
+                "**Variable-length series:** Most models require fixed-length input. Pad/truncate, or use models designed for variable length (e.g. shapelets).",
+                "**ROCKET is underrated:** It beats deep learning on most UCR benchmark datasets while training in seconds. Try it before anything more complex.",
+                "**Label granularity:** Is the label for the whole sequence or per time step? Sequence-level and segmentation tasks need different architectures.",
+            ],
+        },
+        "rec_ts_anomaly": {
+            "title": "Time Series Anomaly Detection",
+            "models": [
+                ("Isolation Forest on rolling window features", "Fast unsupervised baseline — extract rolling stats, then score each window"),
+                ("LSTM Autoencoder", "Learns normal patterns, flags high reconstruction error as anomaly"),
+                ("Prophet residual anomaly detection", "Fit Prophet, flag points where residuals exceed threshold"),
+                ("Seasonal-Trend decomposition (STL) + residuals", "Simple, interpretable — anomalies are points where residual is extreme"),
+            ],
+            "loss": "Reconstruction MSE (autoencoder) · Anomaly score (isolation forest)",
+            "primary_metric": "AUC-ROC (if labels exist) · F1@threshold · Precision@K",
+            "secondary_metrics": ["Time-to-detect (lag)", "False alarm rate"],
+            "watch_out": [
+                "**Threshold selection is hard:** Without labels, there's no objective way to set the anomaly threshold. Use domain knowledge or percentile cutoffs.",
+                "**Seasonality fools simple methods:** A spike that's normal on Monday is anomalous on Sunday. Model seasonality explicitly before flagging residuals.",
+                "**Point anomalies vs contextual:** A value of 100 may be normal in summer but anomalous in winter. Ensure your model has access to temporal context.",
+                "**Evaluation without labels:** Use held-out labeled incidents to validate, even if labels are partial.",
+            ],
+        },
+        "rec_nlp_clf": {
+            "title": "Text Classification",
+            "models": [
+                ("Fine-tune BERT / RoBERTa / DeBERTa", "Best default for most text classification tasks — add a linear head on [CLS] token"),
+                ("DistilBERT", "50% smaller, 60% faster than BERT — good when latency matters and accuracy loss is acceptable"),
+                ("SetFit (few-shot fine-tuning)", "Excellent with fewer than 100 examples — contrastive fine-tuning of sentence embeddings"),
+                ("TF-IDF + Logistic Regression", "Strong baseline, interpretable, fast — often within 5% of transformers on clean data"),
+            ],
+            "loss": "Cross-entropy (single label) · BCE per class (multi-label)",
+            "primary_metric": "AUC-ROC or Macro F1",
+            "secondary_metrics": ["Per-class F1", "Confusion matrix", "Calibration (log loss)"],
+            "watch_out": [
+                "**Domain mismatch:** BERT pretrained on Wikipedia+Books may underperform on specialised domains (medical, legal, code). Use a domain-specific checkpoint.",
+                "**Class imbalance in NLP:** Oversampling minority class text or using weighted loss helps more than SMOTE (text can't be interpolated like tabular features).",
+                "**Sequence length:** BERT truncates at 512 tokens. For long documents, use longformer, sliding window, or hierarchical approaches.",
+                "**Fine-tuning instability:** Transformers fine-tuning can be unstable on small datasets. Run 3–5 seeds and report mean ± std.",
+                "**SetFit for small data:** If you have <500 labelled examples, SetFit almost always beats full fine-tuning.",
+            ],
+        },
+        "rec_nlp_gen": {
+            "title": "Text Generation",
+            "models": [
+                ("Fine-tune GPT-2 / GPT-Neo / LLaMA", "Autoregressive generation — fine-tune for summarisation, QA, or creative tasks"),
+                ("Fine-tune T5 / BART / mT5", "Encoder-decoder — better for seq2seq tasks (summarisation, translation, QA with extractive answers)"),
+                ("Prompt + few-shot with Claude / GPT-4", "Often outperforms fine-tuned smaller models, especially with few examples"),
+                ("RAG (Retrieval-Augmented Generation)", "Combine retrieval + LLM — reduces hallucination and keeps knowledge current"),
+            ],
+            "loss": "Causal language modelling loss (next-token cross-entropy)",
+            "primary_metric": "ROUGE-L (summarisation) · BLEU (translation) · BERTScore · Human eval",
+            "secondary_metrics": ["Perplexity", "Faithfulness (factual grounding)", "Hallucination rate"],
+            "watch_out": [
+                "**Hallucination:** LLMs confidently generate false facts. Use RAG, grounding checks, or constitutional AI techniques.",
+                "**Evaluation is hard:** ROUGE and BLEU are weak proxies for quality. Always supplement with human evaluation or LLM-as-judge.",
+                "**Prompt engineering first:** Before fine-tuning, exhaustively test prompts on a capable base model. Fine-tuning is expensive and often unnecessary.",
+                "**RLHF / RLAIF:** If you need to align outputs with preferences, RLHF or DPO is the current best practice.",
+            ],
+        },
+        "rec_nlp_extraction": {
+            "title": "Information Extraction (NER / Relation)",
+            "models": [
+                ("Fine-tune BERT with token classification head", "Standard approach for NER — BIO tagging over tokens"),
+                ("Span-based extraction (SpanBERT)", "Better for overlapping or nested entities"),
+                ("GLiNER", "Generalised NER — zero-shot entity extraction without task-specific fine-tuning"),
+                ("spaCy + custom NER", "Fast deployment, good tooling — strong baseline for production pipelines"),
+            ],
+            "loss": "Token-level cross-entropy (NER) · Span classification loss",
+            "primary_metric": "Entity-level F1 (strict match) · Span F1",
+            "secondary_metrics": ["Boundary F1 (partial match)", "Per-entity-type F1"],
+            "watch_out": [
+                "**Entity boundary sensitivity:** Strict F1 penalises even one-token boundary errors harshly. Always report both strict and partial/boundary F1.",
+                "**Nested entities:** Standard BIO tagging can't handle overlapping entities. Use span-based models if your schema has nesting.",
+                "**Annotation consistency:** Extraction quality is bounded by label quality. Inter-annotator agreement (Cohen's κ) should be above 0.8 before training.",
+            ],
+        },
+        "rec_nlp_emb": {
+            "title": "Text Embeddings / Semantic Similarity",
+            "models": [
+                ("Sentence-BERT (SBERT) / all-MiniLM-L6-v2", "Fast, strong baseline for semantic similarity — fine-tune with contrastive loss"),
+                ("OpenAI text-embedding-3-large / Cohere Embed", "API-based, no training needed — excellent for search and clustering"),
+                ("E5 / BGE / GTE models", "Open-source, strong on MTEB benchmark — good for on-premise deployment"),
+                ("ColBERT", "Late interaction — better retrieval quality, higher compute cost"),
+            ],
+            "loss": "Contrastive loss (InfoNCE) · Triplet loss · Multiple Negatives Ranking",
+            "primary_metric": "NDCG@10 (retrieval) · Spearman ρ (similarity) · MTEB score",
+            "secondary_metrics": ["Recall@K", "Mean Average Precision (MAP)"],
+            "watch_out": [
+                "**Domain gap:** General embeddings underperform on specialised domains (legal, biomedical, code). Fine-tune with in-domain pairs.",
+                "**Approximate nearest-neighbour at scale:** Exact cosine search is O(n) per query. Use FAISS, Annoy, or ScaNN for large-scale retrieval.",
+                "**Embedding drift:** If the underlying model is updated, all stored embeddings become stale. Plan for re-embedding pipelines.",
+            ],
+        },
+        "rec_nlp_anomaly": {
+            "title": "Text Anomaly Detection",
+            "models": [
+                ("Embed + Isolation Forest", "Embed documents with SBERT, then score with Isolation Forest in embedding space"),
+                ("Perplexity-based scoring (language model)", "High-perplexity text is unusual — use a language model to score each document"),
+                ("One-class SVM on TF-IDF", "Simple baseline for detecting out-of-distribution documents"),
+            ],
+            "loss": "Anomaly score (path length / distance)",
+            "primary_metric": "AUC-ROC (if labels exist) · Precision@K",
+            "secondary_metrics": ["False positive rate at operating threshold"],
+            "watch_out": [
+                "**Short texts are hard:** Embeddings of very short texts are noisy. Aggregate or use character n-gram features for logs and short messages.",
+                "**Novelty vs anomaly:** Novel topics look anomalous but may be legitimate. Domain filtering before anomaly scoring helps.",
+            ],
+        },
+        "rec_vision_clf": {
+            "title": "Image Classification",
+            "models": [
+                ("Fine-tune ResNet / EfficientNet / ConvNeXt", "Strong CNN baselines — pretrained on ImageNet, add a linear head"),
+                ("Fine-tune ViT / DeiT", "Vision Transformer — better than CNNs on large datasets, needs more data"),
+                ("CLIP + linear probe", "Zero/few-shot — embed images and classify by similarity to text descriptions"),
+                ("EfficientNet-B0", "Best accuracy/compute tradeoff for resource-constrained deployment"),
+            ],
+            "loss": "Cross-entropy (single label) · BCE per class (multi-label)",
+            "primary_metric": "Top-1 Accuracy (balanced) · Macro F1 (imbalanced)",
+            "secondary_metrics": ["AUC-ROC", "Confusion matrix"],
+            "watch_out": [
+                "**Data augmentation is critical:** Randomly flip, crop, colour-jitter, and rotate during training. Without it, models overfit to image-specific artefacts.",
+                "**Pretrain → fine-tune:** Never train from scratch unless you have millions of images. Use ImageNet pretrained weights.",
+                "**Class imbalance:** Weighted sampling or class_weight in loss is more stable than oversampling at the image level.",
+                "**Image resolution vs batch size:** Higher resolution improves accuracy but reduces batch size and slows training. Find the best tradeoff for your GPU.",
+            ],
+        },
+        "rec_vision_det": {
+            "title": "Object Detection",
+            "models": [
+                ("YOLOv8 / YOLOv9", "Best speed–accuracy tradeoff for real-time detection — 1-stage, easy to deploy"),
+                ("RT-DETR", "Transformer-based, no NMS post-processing needed, strong accuracy"),
+                ("Faster R-CNN", "2-stage detector — higher accuracy but slower, good when precision matters more than latency"),
+                ("DINO / GroundingDINO", "Zero-shot detection — detect arbitrary objects described in text"),
+            ],
+            "loss": "Classification loss + Regression loss (bounding box) + Objectness loss",
+            "primary_metric": "mAP@0.5 · mAP@0.5:0.95",
+            "secondary_metrics": ["AP per class", "Inference latency (ms)", "FPS"],
+            "watch_out": [
+                "**Annotation quality is the bottleneck:** Bounding box annotation is expensive and error-prone. Use label quality checks and inter-annotator agreement.",
+                "**IoU threshold matters:** mAP@0.5 and mAP@0.5:0.95 tell different stories. Report both.",
+                "**Small object detection:** Default anchor sizes miss small objects. Tune anchor scales or use models with FPN (Feature Pyramid Network).",
+                "**NMS tuning:** Non-maximum suppression threshold affects recall vs precision. Tune for your use case.",
+            ],
+        },
+        "rec_vision_seg": {
+            "title": "Image Segmentation",
+            "models": [
+                ("SAM (Segment Anything Model)", "Zero-shot segmentation — works out of the box with prompts, no training needed"),
+                ("Mask2Former", "State-of-the-art for both semantic and instance segmentation"),
+                ("U-Net", "Classic encoder–decoder — excellent for medical imaging and when data is scarce"),
+                ("DeepLab v3+", "Strong semantic segmentation baseline — simple to fine-tune"),
+            ],
+            "loss": "Pixel-wise cross-entropy + Dice loss",
+            "primary_metric": "mIoU (mean intersection over union) · Dice coefficient",
+            "secondary_metrics": ["Per-class IoU", "Pixel accuracy"],
+            "watch_out": [
+                "**Class imbalance at pixel level:** Background pixels dominate. Use Dice loss or weighted cross-entropy to address this.",
+                "**SAM for zero-shot:** If you don't have a large annotated segmentation dataset, try SAM first — it may be good enough without any fine-tuning.",
+                "**Boundary quality:** mIoU can look good even with fuzzy boundaries. Use boundary F1 if edge sharpness matters.",
+            ],
+        },
+        "rec_vision_emb": {
+            "title": "Image Embeddings / Visual Search",
+            "models": [
+                ("CLIP (ViT-L/14)", "Multimodal — enables text-to-image and image-to-image search"),
+                ("Fine-tuned ResNet / EfficientNet + contrastive loss", "Train with triplet or InfoNCE loss on domain-specific pairs"),
+                ("DINOv2", "Self-supervised ViT — strong visual features without label supervision"),
+            ],
+            "loss": "Contrastive (InfoNCE) · Triplet · Supervised contrastive",
+            "primary_metric": "Recall@K · mAP (retrieval)",
+            "secondary_metrics": ["R-precision", "NDCG@K"],
+            "watch_out": [
+                "**Hard negative mining:** Random negatives are too easy. Sample hard negatives (similar-looking but different class) to prevent embedding collapse.",
+                "**Scalability:** Store embeddings in a vector database (FAISS, Weaviate, Pinecone) for scalable similarity search.",
+            ],
+        },
+        "rec_clustering": {
+            "title": "Clustering",
+            "models": [
+                ("K-Means", "Best for round, equal-size clusters when k is known — fast and scalable"),
+                ("Gaussian Mixture Model (GMM)", "Like K-Means but soft assignments and handles elliptical clusters"),
+                ("DBSCAN", "Finds arbitrary shapes, marks outliers as noise — no need to specify k"),
+                ("HDBSCAN", "Hierarchical DBSCAN — more robust to varying densities, auto-selects k"),
+                ("Agglomerative Clustering", "Produces a dendrogram — good when you want to explore multiple granularities"),
+            ],
+            "loss": "Inertia (K-Means) · BIC (GMM) · None (density-based)",
+            "primary_metric": "Silhouette score · Davies-Bouldin index · Calinski-Harabasz index",
+            "secondary_metrics": ["Elbow plot (inertia vs k)", "Visual inspection in 2D (UMAP/t-SNE projection)", "Cluster size distribution"],
+            "watch_out": [
+                "**K-Means assumes round, equal-size clusters:** If your data doesn't meet this assumption, K-Means will give misleading results.",
+                "**Scale your features:** K-Means and GMM use Euclidean distance — a feature with range 0–10000 will dominate one with range 0–1. Always standardise first.",
+                "**Silhouette score is not ground truth:** A high silhouette score means compact, well-separated clusters — not that the clusters are meaningful. Always validate with domain knowledge.",
+                "**High dimensions:** Euclidean distance becomes unreliable above ~50 dimensions (curse of dimensionality). Run PCA or UMAP first, then cluster.",
+                "**DBSCAN sensitivity:** Results are sensitive to eps and min_samples. Grid search or k-distance plot to choose eps.",
+            ],
+        },
+        "rec_dimred": {
+            "title": "Dimensionality Reduction",
+            "models": [
+                ("PCA", "Fast, linear, interpretable — explained variance ratio tells you how many components to keep"),
+                ("UMAP", "Non-linear — preserves global structure, great for visualisation AND downstream ML"),
+                ("t-SNE", "Non-linear — best 2D/3D visualisation, but don't use output for downstream tasks"),
+                ("Autoencoder", "Non-linear, deep — good for very high-dimensional data (images, genomics)"),
+                ("Kernel PCA", "Non-linear extension of PCA — useful when relationships are polynomial or RBF"),
+            ],
+            "loss": "Reconstruction error (PCA, Autoencoder) · KL divergence (t-SNE) · Cross-entropy (UMAP)",
+            "primary_metric": "Explained variance ratio (PCA) · Trustworthiness score · Downstream task performance",
+            "secondary_metrics": ["Reconstruction error", "Neighbour preservation"],
+            "watch_out": [
+                "**t-SNE is for visualisation only:** t-SNE embeddings are not stable across runs (random init) and distances between clusters are not meaningful. Never use t-SNE output as features.",
+                "**UMAP is better than t-SNE for most purposes:** Faster, more stable, preserves global structure, and can be used as features.",
+                "**PCA assumes linearity:** If your data has non-linear structure (images, manifolds), PCA loses signal. Use Kernel PCA or UMAP.",
+                "**How many components?** For PCA: keep components that explain ≥ 90–95% of variance. For UMAP/t-SNE: typically 2D or 3D for visualisation, 10–50 for features.",
+                "**Don't fit on test data:** PCA and UMAP must be fit on training data only, then transform both train and test. Fitting on the full dataset leaks test statistics.",
+            ],
+        },
+        "rec_anomaly_tabular": {
+            "title": "Tabular Anomaly Detection",
+            "models": [
+                ("Isolation Forest", "Best default — fast, scalable, works well on tabular data with many features"),
+                ("Local Outlier Factor (LOF)", "Detects anomalies relative to local neighbourhood density — good for clusters of varying density"),
+                ("One-Class SVM", "Strong on small, clean datasets where a tight boundary around normal data is possible"),
+                ("Autoencoder", "Good for high-dimensional tabular data — anomalies have high reconstruction error"),
+                ("ECOD (Empirical CDF-Based Outlier Detection)", "Simple, fast, interpretable — no hyperparameters"),
+            ],
+            "loss": "Anomaly score (path length, reconstruction error, distance)",
+            "primary_metric": "AUC-ROC (if labels) · Precision@K · Average Precision",
+            "secondary_metrics": ["False positive rate at operating threshold", "Contamination sensitivity"],
+            "watch_out": [
+                "**Contamination parameter:** Most unsupervised methods need an estimate of the anomaly rate (contamination). If you don't know it, try values between 0.01 and 0.1 and validate on any known anomalies.",
+                "**Feature engineering matters:** Isolation Forest scores raw features — derived features (ratios, rolling stats, z-scores) often help it find anomalies.",
+                "**No labels ≠ no validation:** Collect a small set of confirmed anomalies to validate your threshold, even if you can't train on them.",
+                "**Ensemble of detectors:** Combine scores from multiple algorithms (average rank or mean normalised score) — almost always beats any single method.",
+            ],
+        },
+        "rec_causal_rct": {
+            "title": "Causal Inference from Randomised Experiments (RCT)",
+            "models": [
+                ("Two-sample t-test / Welch's t-test", "Estimate ATE as difference in means — valid under randomisation"),
+                ("Regression adjustment (ANCOVA)", "Control for baseline covariates to reduce variance and improve precision"),
+                ("CUPED (Controlled-experiment Using Pre-Experiment Data)", "Variance reduction using pre-experiment covariates — standard at Airbnb, Netflix"),
+                ("Generalised linear model (GLM)", "Use for binary or count outcomes — logistic regression for conversion rates"),
+            ],
+            "loss": "N/A — this is estimation, not prediction",
+            "primary_metric": "ATE (average treatment effect) with 95% confidence interval",
+            "secondary_metrics": ["p-value", "Cohen's d (effect size)", "Statistical power", "CATE (heterogeneous effects by subgroup)"],
+            "watch_out": [
+                "**Run for at least one full business cycle (7 days):** Day-of-week effects, novelty effects, and ramp-up artefacts distort results from short experiments.",
+                "**Multiple testing:** If you test many metrics, apply Bonferroni or Benjamini-Hochberg correction to control the false discovery rate.",
+                "**SUTVA violation:** If treatment assignment of one unit affects others (social network effects, shared inventory), standard estimators are biased. Use cluster randomisation.",
+                "**Peeking problem:** Looking at results before the experiment reaches the planned sample size inflates Type I error. Use sequential testing (e-values, mSPRT) if you need early stopping.",
+                "**Practical vs statistical significance:** A statistically significant effect at 250M MAU can be tiny in absolute terms. Always report effect size (Cohen's d) alongside p-value.",
+            ],
+        },
+        "rec_causal_obs": {
+            "title": "Causal Inference from Observational Data",
+            "models": [
+                ("Propensity Score Matching (PSM)", "Match treated and control units with similar covariates — removes observed confounding"),
+                ("Inverse Probability Weighting (IPW)", "Reweight observations so treated and control look similar without discarding data"),
+                ("Doubly Robust Estimator (AIPW)", "Combines outcome model + propensity model — consistent if either is correct"),
+                ("Difference-in-Differences (DiD)", "Compare before/after change across treated and control groups over time"),
+                ("Regression Discontinuity (RDD)", "Exploit a threshold in an assignment rule as a natural experiment"),
+            ],
+            "loss": "N/A — causal estimation, not prediction",
+            "primary_metric": "ATE with bootstrap confidence interval · ATT (average treatment effect on the treated)",
+            "secondary_metrics": ["Standardised Mean Difference (SMD) for covariate balance", "Overlap (propensity score distribution)", "Sensitivity analysis (Rosenbaum bounds)"],
+            "watch_out": [
+                "**Unobserved confounders:** PSM and IPW only remove bias from observed confounders. If important confounders are unmeasured, estimates remain biased — and you can't tell from the data alone.",
+                "**Overlap assumption:** If some subgroups only exist in treated or control (no overlap), causal identification fails for those groups. Check propensity score distributions.",
+                "**Covariate balance check:** After matching or weighting, verify that SMD < 0.1 for all covariates. If not, the adjustment is insufficient.",
+                "**DiD parallel trends:** Difference-in-differences assumes control and treatment would have trended the same without treatment. Test this with pre-treatment data.",
+                "**Don't confuse correlation with causation:** A well-fitting predictive model does not imply causal identification. Causal validity requires structural assumptions about the data-generating process.",
+            ],
+        },
+        "rec_causal_iv": {
+            "title": "Instrumental Variables / Natural Experiments",
+            "models": [
+                ("2SLS (Two-Stage Least Squares)", "Classic IV estimator — instrument predicts treatment in stage 1, use fitted values in stage 2"),
+                ("Fuzzy RDD", "When treatment probability jumps discontinuously at a threshold but isn't deterministic"),
+                ("Wald estimator", "Simple IV for binary instrument and binary treatment"),
+            ],
+            "loss": "N/A",
+            "primary_metric": "Local Average Treatment Effect (LATE) with 95% CI",
+            "secondary_metrics": ["First-stage F-statistic (instrument strength)", "Exclusion restriction plausibility"],
+            "watch_out": [
+                "**Weak instruments:** If the instrument weakly predicts treatment (first-stage F < 10), IV estimates are biased and highly variable. Report F-statistic.",
+                "**LATE not ATE:** IV estimates the effect only for compliers (units whose treatment status is actually changed by the instrument) — not the whole population.",
+                "**Exclusion restriction is untestable:** You must argue from domain knowledge that the instrument affects the outcome only through the treatment, not directly.",
+            ],
+        },
+        "rec_causal_discovery": {
+            "title": "Causal Discovery",
+            "models": [
+                ("PC algorithm", "Constraint-based — uses conditional independence tests to infer the skeleton of the DAG"),
+                ("FCI (Fast Causal Inference)", "Like PC but handles hidden confounders — outputs a PAG (partial ancestral graph)"),
+                ("GES (Greedy Equivalence Search)", "Score-based — efficient search over DAG space"),
+                ("LiNGAM", "Assumes linear non-Gaussian data — can identify a unique DAG, not just an equivalence class"),
+                ("NOTEARS / DAG-GNN", "Continuous optimisation for DAG learning — scalable to many variables"),
+            ],
+            "loss": "BIC / likelihood-based scores · Conditional independence tests",
+            "primary_metric": "SHD (structural Hamming distance vs ground truth if known) · F1 on edge recovery",
+            "secondary_metrics": ["Precision and recall on edges", "Orientation accuracy"],
+            "watch_out": [
+                "**Causal discovery is hard:** These algorithms require very strong assumptions (Faithfulness, Causal Markov Condition) that are often only approximately true.",
+                "**Output is a Markov equivalence class, not a unique DAG:** Most algorithms can't orient all edges — you get a CPDAG (completed partially directed acyclic graph).",
+                "**Sample size requirements:** Reliable structure recovery typically needs thousands of samples per variable. With few samples, results are noisy.",
+                "**Validate with domain knowledge:** Always cross-check the inferred graph with subject matter experts. Never trust a discovered DAG blindly.",
+                "**Confounders break most algorithms:** PC and GES assume no hidden confounders. Use FCI or latent variable models if this assumption is doubtful.",
+            ],
+        },
+        "rec_ab_planning": {
+            "title": "A/B Test Sample Size Planning",
+            "models": [
+                ("Power analysis (frequentist)", "n = 2σ²(z_α + z_β)² / δ² for continuous outcomes"),
+                ("Bayesian sequential design", "Set stopping rules based on posterior probability — allows early stopping with controlled error"),
+                ("CUPED / variance reduction", "Reduce required n by controlling for pre-experiment covariates — often halves required sample size"),
+            ],
+            "loss": "N/A",
+            "primary_metric": "Required n per arm · Expected experiment duration",
+            "secondary_metrics": ["Power curve", "MDE (minimum detectable effect) at target n"],
+            "watch_out": [
+                "**Effect size assumption is critical:** The sample size formula is very sensitive to δ (minimum detectable effect). Be conservative — small effects need large samples.",
+                "**Two-tailed vs one-tailed:** Use two-tailed tests unless you have a strong prior directional hypothesis. One-tailed halves the required n but doubles the risk of missing a negative effect.",
+                "**Run for ≥ 1 week regardless of n:** Even if you hit your sample size in 2 days, novelty effects and day-of-week patterns require a full business cycle.",
+                "**Plan guardrail metrics upfront:** Define which metrics must not decrease (e.g. session length, retention) before the experiment starts — not after seeing results.",
+                "**Multiple metrics = multiple comparisons:** Correct for FWER or FDR if testing many metrics simultaneously.",
+            ],
+        },
+        "rec_ab_analysis": {
+            "title": "A/B Test Result Analysis",
+            "models": [
+                ("Welch's t-test", "Continuous outcome — does not assume equal variance between groups"),
+                ("Mann-Whitney U", "Non-parametric alternative — use when normality is violated"),
+                ("Chi-square / Fisher's exact", "Binary outcome (conversion, churn)"),
+                ("Bootstrap confidence intervals", "Model-free — works for any metric, robust to distributional assumptions"),
+                ("Bayesian A/B (Beta-Binomial / Normal-Normal)", "Provides posterior probability of treatment being better — more intuitive than p-values"),
+            ],
+            "loss": "N/A",
+            "primary_metric": "p-value · 95% CI on the difference · Cohen's d",
+            "secondary_metrics": ["Lift (%)", "Statistical power (post-hoc)", "Guardrail metric movements"],
+            "watch_out": [
+                "**p-value is not the probability that treatment is better:** It's the probability of seeing this result (or more extreme) if H₀ is true. A p-value of 0.04 does not mean 96% chance of a real effect.",
+                "**Significant ≠ meaningful:** With 250M users, tiny effects become statistically significant. Always report effect size (Cohen's d) and decide if the effect is practically worth shipping.",
+                "**Guardrail metrics:** Check that key health metrics (session length, D7 retention, crash rate) didn't worsen. A lift in revenue doesn't justify a collapse in engagement.",
+                "**Simpson's Paradox:** A test that wins overall can lose in every subgroup if group sizes differ across variants. Segment your results.",
+                "**Don't re-analyse after peeking:** If you checked results mid-experiment and now re-analyse at the end, your Type I error rate is inflated. Use sequential testing methods if you need interim looks.",
+            ],
+        },
+        "rec_ab_survival": {
+            "title": "Time-to-Event A/B Analysis",
+            "models": [
+                ("Kaplan-Meier estimator", "Non-parametric survival curves — visualise and compare survival distributions"),
+                ("Log-rank test", "Test whether two survival curves are significantly different"),
+                ("Cox proportional hazards model", "Estimate treatment effect while controlling for covariates (like regression for time-to-event)"),
+            ],
+            "loss": "Partial likelihood (Cox)",
+            "primary_metric": "Hazard ratio (HR) with 95% CI · Log-rank p-value",
+            "secondary_metrics": ["Median survival time", "Survival probability at fixed time points"],
+            "watch_out": [
+                "**Censoring:** Users who haven't yet churned/purchased by analysis date are right-censored. Standard t-tests ignore this — always use survival analysis for time-to-event outcomes.",
+                "**Proportional hazards assumption:** Cox assumes the treatment effect is constant over time. Test with Schoenfeld residuals.",
+                "**Competing risks:** If users can churn OR convert (mutually exclusive), use competing risks models instead of standard survival analysis.",
+            ],
+        },
+        "rec_generative": {
+            "title": "Generative Modelling",
+            "models": [
+                ("VAE (Variational Autoencoder)", "Learns a smooth latent space — good for interpolation and structured generation"),
+                ("GAN (Generative Adversarial Network)", "Sharper samples than VAE — training is unstable, use StyleGAN2 or BigGAN as starting points"),
+                ("Diffusion Models (DDPM / Stable Diffusion)", "State-of-the-art image generation — slow sampling but highest quality"),
+                ("Normalising Flows", "Exact likelihood, invertible — good when you need probability density estimates"),
+            ],
+            "loss": "ELBO (VAE) · Adversarial (GAN) · Denoising score matching (Diffusion) · NLL (Flows)",
+            "primary_metric": "FID (Fréchet Inception Distance) · Inception Score · Human evaluation",
+            "secondary_metrics": ["Precision and recall (diversity vs fidelity tradeoff)", "LPIPS (perceptual similarity)"],
+            "watch_out": [
+                "**GAN training instability:** Mode collapse, training oscillation, and sensitivity to hyperparameters are common. Use WGAN-GP or StyleGAN architectures with gradient penalties.",
+                "**FID can be gamed:** A model that memorises the training set has a perfect FID. Measure diversity and check for memorisation.",
+                "**Diffusion is expensive:** Sampling from diffusion models requires hundreds of denoising steps. Use DDIM or consistency models for faster inference.",
+                "**Tabular data generation:** GANs and VAEs underperform on tabular data. Use CTGAN or TVAE for synthetic tabular data generation.",
+            ],
+        },
+    }
 
+    # ── State init ─────────────────────────────────────────────────────────────
+    if "advisor_path" not in st.session_state:
+        st.session_state.advisor_path = []
+
+    # ── Helper: get current node from path ────────────────────────────────────
+    def _follow_path(path):
+        node = "problem_type"
+        for _, answer in path:
+            next_map = TREE.get(node, {}).get("next", {})
+            matched = None
+            for key, target in next_map.items():
+                if key in answer.lower():
+                    matched = target
+                    break
+            if matched is None:
+                break
+            node = matched
+        return node
+
+    current_node = _follow_path(st.session_state.advisor_path)
+
+    # ── Completed Q&A history ─────────────────────────────────────────────────
+    for i, (node_id, answer) in enumerate(st.session_state.advisor_path):
+        q_text = TREE.get(node_id, {}).get("q", "")
         st.markdown(
-            '<div style="font-family:Space Grotesk,sans-serif;font-size:1.1rem;font-weight:700;'
-            'color:#c4b5fd;margin-bottom:1rem;text-transform:uppercase;letter-spacing:0.05em">'
-            "✦ Recommendation</div>",
+            f'<div class="datrix-card" style="opacity:0.65;padding:0.75rem 1.1rem;margin-bottom:0.5rem;">'
+            f'<div style="font-size:0.72rem;color:#64748b;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:0.2rem">Step {i + 1}</div>'
+            f'<div style="color:#94a3b8;font-size:0.88rem;margin-bottom:0.3rem">{q_text}</div>'
+            f'<div style="color:#22d3ee;font-weight:600;font-size:0.92rem">✓ &nbsp;{answer}</div>'
+            f"</div>",
             unsafe_allow_html=True,
         )
 
-        st.markdown("**Recommended models**")
-        for name, reason in rec["models"]:
-            st.markdown(
-                f'<div class="datrix-card" style="margin-bottom:0.5rem;padding:0.75rem 1rem">'
-                f'<span style="color:#e2e8f0;font-weight:600">{name}</span>'
-                f'<span style="color:#94a3b8;font-size:0.85rem"> — {reason}</span></div>',
-                unsafe_allow_html=True,
-            )
-
-        col_a, col_b = st.columns(2)
-        with col_a:
-            st.markdown(
-                f'<div class="datrix-card"><div style="font-size:0.72rem;color:#64748b;'
-                f'text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.3rem">Loss function</div>'
-                f'<div style="color:#22d3ee;font-weight:600">{rec["loss"]}</div></div>',
-                unsafe_allow_html=True,
-            )
-        with col_b:
-            st.markdown(
-                f'<div class="datrix-card"><div style="font-size:0.72rem;color:#64748b;'
-                f'text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.3rem">Primary metric</div>'
-                f'<div style="color:#22d3ee;font-weight:600">{rec["primary_metric"]}</div></div>',
-                unsafe_allow_html=True,
-            )
+    # ── Current question or recommendation ────────────────────────────────────
+    if current_node in TREE:
+        q_data = TREE[current_node]
+        step_num = len(st.session_state.advisor_path) + 1
 
         st.markdown(
-            '<div class="datrix-card"><div style="font-size:0.72rem;color:#64748b;'
-            'text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.4rem">Secondary metrics</div>'
+            f'<div style="font-size:0.72rem;color:#7c3aed;text-transform:uppercase;'
+            f'letter-spacing:0.1em;margin:1.5rem 0 0.4rem;font-weight:600">Step {step_num}</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'<div style="font-size:1.15rem;font-weight:700;color:#e2e8f0;margin-bottom:0.5rem">'
+            f'{q_data["q"]}</div>',
+            unsafe_allow_html=True,
+        )
+        if q_data.get("help"):
+            st.caption(q_data["help"])
+
+        selected = st.radio(
+            "Select an option",
+            q_data["options"],
+            key=f"advisor_radio_{current_node}",
+            label_visibility="collapsed",
+        )
+
+        st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
+        btn_col, back_col = st.columns([2, 1])
+        with btn_col:
+            if st.button("Next →", type="primary", use_container_width=True):
+                st.session_state.advisor_path.append((current_node, selected))
+                st.rerun()
+        with back_col:
+            if st.session_state.advisor_path and st.button(
+                "← Back", use_container_width=True
+            ):
+                st.session_state.advisor_path.pop()
+                st.rerun()
+
+    elif current_node in RECS:
+        # ── Recommendation panel ──────────────────────────────────────────────
+        rec = RECS[current_node]
+
+        st.markdown(
+            f'<div style="font-family:Space Grotesk,sans-serif;font-size:1.25rem;font-weight:800;'
+            f'background:linear-gradient(135deg,#22d3ee,#a78bfa);-webkit-background-clip:text;'
+            f'-webkit-text-fill-color:transparent;background-clip:text;margin:1.5rem 0 1rem">'
+            f"✦ {rec['title']}</div>",
+            unsafe_allow_html=True,
+        )
+
+        # Models
+        st.markdown(
+            '<div style="font-size:0.72rem;color:#64748b;text-transform:uppercase;'
+            'letter-spacing:0.08em;margin-bottom:0.6rem">Recommended approaches</div>',
+            unsafe_allow_html=True,
+        )
+        for i, (name, reason) in enumerate(rec["models"]):
+            badge = (
+                '<span style="background:linear-gradient(135deg,#7c3aed,#0891b2);'
+                'color:white;font-size:0.65rem;padding:1px 7px;border-radius:999px;'
+                'font-weight:700;margin-right:8px">TOP PICK</span>'
+                if i == 0
+                else ""
+            )
+            st.markdown(
+                f'<div class="datrix-card" style="margin-bottom:0.45rem;padding:0.75rem 1rem">'
+                f"{badge}"
+                f'<span style="color:#e2e8f0;font-weight:600">{name}</span>'
+                f'<div style="color:#94a3b8;font-size:0.83rem;margin-top:0.2rem">{reason}</div>'
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+        # Loss + Metric
+        m1, m2 = st.columns(2)
+        with m1:
+            st.markdown(
+                f'<div class="datrix-card"><div style="font-size:0.7rem;color:#64748b;'
+                f'text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.35rem">Loss function</div>'
+                f'<div style="color:#22d3ee;font-weight:600;font-size:0.9rem">{rec["loss"]}</div></div>',
+                unsafe_allow_html=True,
+            )
+        with m2:
+            st.markdown(
+                f'<div class="datrix-card"><div style="font-size:0.7rem;color:#64748b;'
+                f'text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.35rem">Primary metric</div>'
+                f'<div style="color:#22d3ee;font-weight:600;font-size:0.9rem">{rec["primary_metric"]}</div></div>',
+                unsafe_allow_html=True,
+            )
+
+        # Secondary metrics
+        st.markdown(
+            '<div class="datrix-card" style="margin-top:0.5rem">'
+            '<div style="font-size:0.7rem;color:#64748b;text-transform:uppercase;'
+            'letter-spacing:0.08em;margin-bottom:0.5rem">Secondary metrics</div>'
             + "".join(
                 f'<span style="display:inline-block;background:rgba(124,58,237,0.15);'
-                f"border:1px solid rgba(124,58,237,0.3);color:#c4b5fd;border-radius:6px;"
-                f'padding:2px 10px;font-size:0.82rem;margin:2px 4px 2px 0">{m}</span>'
+                f'border:1px solid rgba(124,58,237,0.3);color:#c4b5fd;border-radius:6px;'
+                f'padding:3px 12px;font-size:0.82rem;margin:2px 4px 2px 0">{m}</span>'
                 for m in rec["secondary_metrics"]
             )
             + "</div>",
             unsafe_allow_html=True,
         )
 
-        if rec.get("imbalance_strategy"):
-            st.warning(f"**Imbalance:** {rec['imbalance_strategy']}")
+        # Watch out for
+        st.markdown(
+            '<div style="font-size:0.72rem;color:#f59e0b;text-transform:uppercase;'
+            'letter-spacing:0.08em;margin:1.2rem 0 0.5rem;font-weight:700">⚠ Watch out for</div>',
+            unsafe_allow_html=True,
+        )
+        for note in rec["watch_out"]:
+            st.markdown(
+                f'<div class="datrix-card" style="margin-bottom:0.4rem;padding:0.7rem 1rem;'
+                f'border-left:3px solid #f59e0b">'
+                f'<span style="color:#e2e8f0;font-size:0.88rem;line-height:1.6">{note}</span></div>',
+                unsafe_allow_html=True,
+            )
 
-        if rec.get("notes"):
-            st.markdown("**Notes**")
-            for note in rec["notes"]:
-                st.markdown(f"- {note}")
+        if st.session_state.advisor_path and st.button("← Back", use_container_width=False):
+            st.session_state.advisor_path.pop()
+            st.rerun()
 
     st.markdown("---")
-    if st.button("Start over", type="secondary"):
-        st.session_state.advisor_answers = {}
-        for k in list(st.session_state.keys()):
-            if k.startswith("advisor_"):
-                del st.session_state[k]
-        st.rerun()
-    if st.button("Back to home", type="secondary"):
-        go_to("upload")
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("↺ Start over", use_container_width=True):
+            st.session_state.advisor_path = []
+            for k in list(st.session_state.keys()):
+                if k.startswith("advisor_"):
+                    del st.session_state[k]
+            st.rerun()
+    with c2:
+        if st.button("← Back to home", use_container_width=True):
+            go_to("upload")
